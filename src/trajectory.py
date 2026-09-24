@@ -14,14 +14,27 @@ import numpy as np
 
 
 class TrajectoryBuffer:
-    """全量累积轨迹缓冲（可增长数组）。C_0 = I 自动占位。"""
+    """全量累积轨迹缓冲（可增长数组）。C_0 = I 自动占位。
+
+    支持镜头分段（方案①）：调用 start_new_shot() 后，下一帧作为新镜头起点，
+    累积轨迹重置为 C = I（镜头切换处不跨镜头累积）。
+    """
 
     def __init__(self):
         self._mats: list[np.ndarray] = [np.eye(3)]
+        self._pending_reset = False
+
+    def start_new_shot(self) -> None:
+        """标记：下一个 append 的帧作为新镜头起点，累积轨迹重置为 I。"""
+        self._pending_reset = True
 
     def append(self, M_t: np.ndarray) -> np.ndarray:
-        """追加帧间变换 M_t，累积 C_t = M_t·C_{t-1}，返回 C_t。"""
-        c = np.asarray(M_t, dtype=np.float64) @ self._mats[-1]
+        """追加帧间变换 M_t，累积 C_t = M_t·C_{t-1}；新镜头起点则 C = I。"""
+        if self._pending_reset:
+            c = np.eye(3)
+            self._pending_reset = False
+        else:
+            c = np.asarray(M_t, dtype=np.float64) @ self._mats[-1]
         self._mats.append(c)
         return c
 

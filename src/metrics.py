@@ -66,12 +66,9 @@ def distortion(B_list: list[np.ndarray]) -> float:
     return float(np.mean(vals)) if vals else 0.0
 
 
-def stability(params_raw: np.ndarray, params_smooth: np.ndarray) -> dict:
-    """稳定度（§9 v2 逐维归一）。
+def _stability_single(params_raw: np.ndarray, params_smooth: np.ndarray) -> dict:
+    """单段序列的稳定度（内部函数）。"""
 
-    输入：(4, N) 参数序列（t_x, t_y, θ, ln s；θ 应为解缠域）。
-    返回 {E_raw, E_smooth, S_per_dim, S, S_reference_unnormalized, degenerate_dims, negative}。
-    """
     def energy(p: np.ndarray) -> np.ndarray:
         d2 = p[:, 2:] - 2 * p[:, 1:-1] + p[:, :-2]  # 二阶差分
         return np.sum(d2 * d2, axis=1)
@@ -96,4 +93,47 @@ def stability(params_raw: np.ndarray, params_smooth: np.ndarray) -> dict:
         "S_reference_unnormalized": float(ref),
         "degenerate_dims": degenerate,
         "negative": bool(s_total < 0),
+    }
+
+
+def stability(params_raw: np.ndarray, params_smooth: np.ndarray,
+              shots: list[tuple[int, int]] | None = None) -> dict:
+    """稳定度（§9 v2 逐维归一）；多镜头时**逐镜头加权聚合**（方案①，用户确认）。
+
+    跨镜头切换处的二阶差分不具物理意义（同一序列里是两个不同场景），故按镜头
+    分段计算后以帧数加权聚合；同时给出整段（不分段）结果作为参考值。
+    输入 (4, N) 参数序列（t_x, t_y, θ, ln s；θ 应为解缠域）。
+    """
+    n = params_raw.shape[1]
+    if shots is None:
+        shots = [(0, n)]
+    per_shot = []
+    for s, e in shots:
+        if e - s < 3:   # 二阶差分至少需要 3 帧
+            continue
+        r = _stability_single(params_raw[:, s:e], params_smooth[:, s:e])
+        r["start"], r["end"], r["n_frames"] = int(s), int(e), int(e - s)
+        per_shot.append(r)
+    if not per_shot:
+        return _stability_single(params_raw, params_smooth) | {
+            "shots": [], "n_shots_used": 0, "skipped_short_shots": len(shots)}
+
+    w = np.array([r["n_frames"] for r in per_shot], dtype=np.float64)
+    wsum = w.sum()
+    s_per_dim = (np.array([r["S_per_dim"] for r in per_shot]) * w[:, None]).sum(0) / wsum
+    e_raw = (np.array([r["E_raw"] for r in per_shot]) * w[:, None]).sum(0) / wsum
+    e_smooth = (np.array([r["E_smooth"] for r in per_shot]) * w[:, None]).sum(0) / wsum
+    whole = _stability_single(params_raw, params_smooth)
+    return {
+        "E_raw": e_raw.tolist(),
+        "E_smooth": e_smooth.tolist(),
+        "S_per_dim": s_per_dim.tolist(),
+        "S": float(np.mean(s_per_dim)),
+        "S_reference_unnormalized": whole["S_reference_unnormalized"],
+        "S_whole_sequence": whole["S"],
+        "degenerate_dims": sorted({d for r in per_shot for d in r["degenerate_dims"]}),
+        "negative": any(r["negative"] for r in per_shot) or float(np.mean(s_per_dim)) < 0,
+        "shots": per_shot,
+        "n_shots_used": len(per_shot),
+        "skipped_short_shots": len(shots) - len(per_shot),
     }

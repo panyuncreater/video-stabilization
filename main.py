@@ -23,7 +23,8 @@ import time
 import cv2
 import numpy as np
 
-from src import crop, features, io_utils, metrics, motion, smoothing, tracking, trajectory, visualize, warp
+from src import (crop, features, io_utils, metrics, motion, shots, smoothing,
+                 tracking, trajectory, visualize, warp)
 
 logger = logging.getLogger("stabilizer")
 
@@ -51,7 +52,8 @@ def parse_args() -> argparse.Namespace:
 def pass1_estimate(args, reader: io_utils.VideoReader):
     """pass 1：逐帧估计 M_t，累积轨迹，流式计算原视频 ITF。返回轨迹与统计。"""
     traj = trajectory.TrajectoryBuffer()
-    deg = {"mt_identity_frames": 0, "ransac_fallback_frames": 0, "redetection_frames": 0}
+    deg = {"mt_identity_frames": 0, "ransac_fallback_frames": 0,
+           "redetection_frames": 0, "shot_cuts": []}
     itf_orig_vals = []
 
     prev = reader.read()
@@ -61,12 +63,14 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
     points = features.detect_corners(prev_gray, args.max_corners)
     m_prev = np.eye(3)
     fail_streak = 0
+    last_cut = -10**9   # 上次切换帧（用于最短镜头长度约束）
     n_frames = 1
 
     while True:
         frame = reader.read()
         if frame is None:
             break
+        frame_idx = n_frames          # 当前帧编号（0-based）
         n_frames += 1
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         itf_orig_vals.append(metrics.psnr_gray(prev, frame))
@@ -75,7 +79,7 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
         if len(points) < MIN_CORNERS:
             points = features.detect_corners_retry_low(prev_gray, args.max_corners)
             if len(points) < MIN_CORNERS:
-                logger.warning("第 %d 帧角点数 < %d（重检后仍不足），该帧 M_t = I", n_frames - 1, MIN_CORNERS)
+                logger.warning("第 %d 帧角点数 < %d（重检后仍不足），该帧 M_t = I", frame_idx, MIN_CORNERS)
                 traj.append(np.eye(3))
                 m_prev = np.eye(3)
                 deg["mt_identity_frames"] += 1
@@ -90,8 +94,25 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
         alive = int(status.sum())
         if alive >= 2:
             M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status])
+            inlier_ratio = float(inl.sum()) / float(alive)
         else:
             M, inl = None, np.zeros(0, dtype=bool)
+            inlier_ratio = 0.0
+
+        # 方案①：镜头切换检测（MAD 高 且 运动不一致 且 距上次切换 ≥ 最短镜头长度）
+        mad = shots.frame_mad(prev_gray, gray)
+        if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut):
+            logger.info("检测到镜头切换 @帧 %d（MAD=%.1f，内点率=%.2f），新镜头起算轨迹",
+                        frame_idx, mad, inlier_ratio)
+            deg["shot_cuts"].append(frame_idx)
+            traj.start_new_shot()
+            traj.append(np.eye(3))     # 切换帧 M_t = I，新镜头起点 C = I
+            m_prev = np.eye(3)
+            fail_streak = 0            # 新镜头重新起算，不累计失败
+            last_cut = frame_idx
+            points = features.detect_corners(gray, args.max_corners)
+            prev, prev_gray = frame, gray
+            continue
 
         if M is None or inl.sum() < MIN_INLIERS:
             logger.warning("第 %d 帧 RANSAC 内点数 < %d，沿用 M_{t-1}", n_frames - 1, MIN_INLIERS)
@@ -116,8 +137,10 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
 
         prev, prev_gray = frame, gray
 
-    logger.info("pass 1 完成: %d 帧, 角点重检测 %d 次, M=I 降级 %d 帧, 沿用上一帧 %d 帧",
-                n_frames, deg["redetection_frames"], deg["mt_identity_frames"], deg["ransac_fallback_frames"])
+    logger.info("pass 1 完成: %d 帧, 镜头切换 %d 处 %s, 角点重检测 %d 次, "
+                "M=I 降级 %d 帧, 沿用上一帧 %d 帧",
+                n_frames, len(deg["shot_cuts"]), deg["shot_cuts"],
+                deg["redetection_frames"], deg["mt_identity_frames"], deg["ransac_fallback_frames"])
     return traj, deg, itf_orig_vals, n_frames
 
 
@@ -145,20 +168,27 @@ def run(args) -> int:
         traj, deg, itf_orig_vals, n_frames = pass1_estimate(args, reader)
     t1 = time.perf_counter()
 
-    # ---------- 轨迹平滑（参数空间） ----------
+    # ---------- 镜头分段（方案①） ----------
+    shot_list = shots.collapse_shots(shots.segment_shots(deg["shot_cuts"], n_frames))
+
+    # ---------- 轨迹平滑（参数空间，逐镜头独立） ----------
     params_raw = trajectory.decompose(traj.matrices)
-    params_raw[2] = np.unwrap(params_raw[2])  # θ 解缠（§7）
-    params_smooth = smooth_trajectory(params_raw, args.smooth, args.window)
-    # 锚定：减去平滑首点常数偏移（Δ² 能量不变；小偏差下与矩阵锚定等价，保证 B_0 = I）
-    params_smooth = params_smooth - params_smooth[:, [0]]
+    params_smooth = np.zeros_like(params_raw)
     clamp_events = 0
-    if not args.no_clamp:
-        params_smooth, clamp_events = trajectory.clamp_drift(
-            params_raw, params_smooth,
-            args.clamp_tx, np.deg2rad(args.clamp_theta), args.clamp_ln_s)
-        if clamp_events:
-            logger.info("漂移限幅触发 %d 处（--clamp-tx %.1f px / --clamp-theta %.1f° / --clamp-ln-s %.3f）",
-                        clamp_events, args.clamp_tx, args.clamp_theta, args.clamp_ln_s)
+    for s, e in shot_list:
+        params_raw[2, s:e] = np.unwrap(params_raw[2, s:e])      # θ 逐镜头解缠（§7）
+        seg = smooth_trajectory(params_raw[:, s:e], args.smooth, args.window)
+        # 锚定：减去本镜头平滑首点常数偏移（Δ² 能量不变；小偏差下与矩阵锚定等价，B_0 = I）
+        seg = seg - seg[:, [0]]
+        if not args.no_clamp:
+            seg, ev = trajectory.clamp_drift(
+                params_raw[:, s:e], seg,
+                args.clamp_tx, np.deg2rad(args.clamp_theta), args.clamp_ln_s)
+            clamp_events += ev
+        params_smooth[:, s:e] = seg
+    if clamp_events:
+        logger.info("漂移限幅触发 %d 处（--clamp-tx %.1f px / --clamp-theta %.1f° / --clamp-ln-s %.3f）",
+                    clamp_events, args.clamp_tx, args.clamp_theta, args.clamp_ln_s)
     c_smooth = trajectory.rebuild(params_smooth)
     c_raw = traj.matrices
     B_list = [c_smooth[t] @ np.linalg.inv(c_raw[t]) for t in range(len(c_raw))]
@@ -194,7 +224,7 @@ def run(args) -> int:
     # ---------- 指标 ----------
     itf_orig = float(np.mean(itf_orig_vals))
     itf_stab = metrics.compute_itf(args.output)
-    stab = metrics.stability(params_raw, params_smooth)
+    stab = metrics.stability(params_raw, params_smooth, shot_list)  # 逐镜头加权聚合（方案①）
     if stab["degenerate_dims"]:
         logger.warning("稳定度：维度 %s 原始能量过低，按退化记 0", stab["degenerate_dims"])
     if stab["negative"]:
@@ -213,6 +243,8 @@ def run(args) -> int:
         "clamp": {"enabled": not args.no_clamp, "tx_px": args.clamp_tx,
                   "theta_deg": args.clamp_theta, "ln_s": args.clamp_ln_s,
                   "events": clamp_events},
+        "shots": {"n_shots": len(shot_list), "cuts": deg["shot_cuts"],
+                  "segments": [[int(s), int(e)] for s, e in shot_list]},
         "metrics": {
             "itf_original_db": itf_orig,
             "itf_stabilized_db": itf_stab,
@@ -237,7 +269,7 @@ def run(args) -> int:
         stem = os.path.splitext(os.path.basename(args.input))[0]
         p1 = os.path.join("docs", f"trajectory_{stem}.png")
         p2 = os.path.join("docs", f"metrics_bar_{stem}.png")
-        visualize.plot_trajectories(params_raw, params_smooth, p1)
+        visualize.plot_trajectories(params_raw, params_smooth, p1, cuts=deg["shot_cuts"])
         visualize.plot_metrics_bars(result["metrics"], p2)
         logger.info("可视化: %s, %s", p1, p2)
 

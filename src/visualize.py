@@ -21,14 +21,19 @@ _PARAM_NAMES = ["t_x (px)", "t_y (px)", "θ (rad)", "ln s"]
 _PARAM_KEYS = ["tx", "ty", "theta", "ln_s"]
 
 
-def plot_trajectories(params_raw: np.ndarray, params_smooth: np.ndarray, out_path: str) -> None:
-    """轨迹对比图（2×2）：raw vs smooth。"""
+def plot_trajectories(params_raw: np.ndarray, params_smooth: np.ndarray, out_path: str,
+                      cuts: list[int] | None = None) -> None:
+    """轨迹对比图（2×2）：raw vs smooth；cuts 处画竖向虚线标记镜头切换。"""
     fig, axes = plt.subplots(2, 2, figsize=(12, 7))
     n = params_raw.shape[1]
     t = np.arange(n)
     for d, ax in enumerate(axes.flat):
         ax.plot(t, params_raw[d], color="#d62728", lw=1.0, label="原始轨迹")
         ax.plot(t, params_smooth[d], color="#1f77b4", lw=1.4, label="平滑轨迹")
+        if cuts:
+            for c in cuts:
+                ax.axvline(c, color="#7f7f7f", ls="--", lw=0.8,
+                           label="镜头切换" if (d == 0 and c == cuts[0]) else None)
         ax.set_title(_PARAM_NAMES[d])
         ax.set_xlabel("帧")
         ax.grid(alpha=0.3)

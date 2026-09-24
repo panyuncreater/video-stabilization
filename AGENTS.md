@@ -47,6 +47,8 @@ src/
   motion.py       estimate_similarity_ransac(src_pts, dst_pts, thresh=2.5, conf=0.99) -> (M 3x3, inlier_mask)
   trajectory.py   TrajectoryBuffer：全量累积轨迹 C_t（可增长数组存储，供平滑/指标/可视化使用）；
                   参数空间分解/重建工具；定长滑窗需求一律复用 ds/ring_buffer（环形缓冲不承载全量历史）
+  shots.py        镜头切分：切换检测（MAD + 内点率双条件）+ 镜头分段（v2.1 新增，
+                  多镜头素材必需；单镜头素材自动检出 0 次切换，不影响既有口径）
   smoothing.py    MovingAverageSmoother / GaussianSmoother / MedianSmoother
                   统一接口：__init__(window:int)；update(x:float)->float|None；flush()->list[float]
   warp.py         warp_frame(img, M) -> out（M 为输入→输出正向映射，内部求逆采样）
@@ -146,7 +148,7 @@ $$D = \frac{1}{N} \sum_{t=0}^{N-1} \left( |\ln s_t| + |\theta_t| \right)$$
 
 $$S = \frac{1}{4}\sum_{d} \left( 1 - \frac{E_{\mathrm{smooth},d}}{E_{\mathrm{raw},d}} \right)$$
 
-  逐维归一消除 px / rad / 无量纲的量纲混合（v1 直接混合相加，已修正）。$E_{\mathrm{raw},d} < 10^{-9}$ 的维度视为无抖动，该项记 0 并告警；$S \le 1$ 恒成立，$S < 0$ 表示平滑后更差，触发告警并写入已知问题。**验收线（v2 新增）**：合成视频 $S \ge 0.5$；实拍视频 $S > 0$。未归一的旧口径 $1 - E_{\mathrm{smooth}}/E_{\mathrm{raw}}$ 作为参考值一并报告。
+  逐维归一消除 px / rad / 无量纲的量纲混合（v1 直接混合相加，已修正）。$E_{\mathrm{raw},d} < 10^{-9}$ 的维度视为无抖动，该项记 0 并告警；$S \le 1$ 恒成立，$S < 0$ 表示平滑后更差，触发告警并写入已知问题。**验收线（v2 新增）**：合成视频 $S \ge 0.5$；实拍视频 $S > 0$。未归一的旧口径 $1 - E_{\mathrm{smooth}}/E_{\mathrm{raw}}$ 作为参考值一并报告。**多镜头素材（v2.1）**：$S$ 按镜头分段计算后以帧数加权聚合（跨切换的二阶差分无物理意义），并同时报告整段参考值；两种口径数值不可直接比较。
 - **可视化定义（v2 新增）**：轨迹对比图 = 2×2 子图（$t_x, t_y, \theta, \ln s$），每图绘制 raw 轨迹（$C_t$ 分解）与平滑轨迹（$C_t^{\mathrm{smooth}}$ 分解）双曲线对比；可另附 $B_t$ 各维分解曲线。指标柱状图 = 原视频 vs 稳定视频的 ITF 与 S，另示裁剪率与 D。
 
 ## 十、数据结构得分点（必须写进代码注释与 STATE 决策日志）
@@ -190,6 +192,7 @@ $$S = \frac{1}{4}\sum_{d} \left( 1 - \frac{E_{\mathrm{smooth},d}}{E_{\mathrm{raw
 - 某帧角点数 < 20：自动降低 Harris 阈值重检一次；仍不足则该帧 $M_t = I$，记录 warning。
 - RANSAC 内点数 < 6：该帧沿用 $M_{t-1}$，记录 warning；连续 ≥ 5 帧失败则终止并报告（退出码 2）。
 - 跟踪存活点数 < 30：在下一帧重新检测角点。
+- **镜头切换（v2.1 新增，方案①）**：判据为「帧间灰度 MAD > 25.0 **且** 该帧 RANSAC 内点率 < 0.30 **且** 距上次切换 ≥ 12 帧」——双条件用于区分真切换（运动无法被单个相似变换解释，内点率崩塌）与快速甩镜（帧差大但运动一致，不应切分）。判定为切换时：该帧 $M_t = I$、累积轨迹在该帧**重置为新镜头起点**（$C = I$）、并从切换帧重新检测角点；平滑与稳定度均**逐镜头独立**计算。切换帧列表写入 metrics.json 的 `degradations.shot_cuts`，并在轨迹图上以竖向虚线标注。
 - 任何异常降级都必须在 PROJECT_STATE.md 与最终报告的「已知问题」中体现，禁止静默吞掉。
 
 ## 十三、会话协议（每次对话必须执行）
@@ -281,3 +284,5 @@ src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_
 | 漂移限幅机制（--clamp-*，默认开启） | E1 |
 | M1 端到端回归门槛 | E2 |
 | 报告局限性讨论要求 | E3 |
+
+**v2.1（2026-09-25）**：新增镜头切分能力（`src/shots.py`）以应对多镜头剪辑素材——此类素材按单镜头假设累积全局轨迹会污染轨迹、放大补偿偏差并压低裁剪率（实测 test1.mp4 由 0.786 回落至达标区间）。相应补充：§6 目录加 shots.py；§9 稳定度多镜头改为逐镜头加权聚合；§12 新增镜头切换处理规则。确认人：用户（2026-09-25 选方案①并确认新增模块与指标口径）。
