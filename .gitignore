@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 大体积数据文件（不入库，由本地提供 / 工具重新生成）
+data/*.mp4
+data/synthetic/*.mp4
+output/
+
+# IDE / 系统杂项
+.DS_Store
+Thumbs.db
+
+# AI 助手工作目录
+.workbuddy/

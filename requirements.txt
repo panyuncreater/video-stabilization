@@ -1,0 +1,8 @@
+# 依赖锁定（AGENTS.md §3：按实际环境精确锁定；升级视同变更依赖，须先确认）
+# 状态：已安装核对（2026-09-24，阿里云镜像源）
+# 使用：python -m venv .venv 并激活后执行 pip install -r requirements.txt（详见 README.md）
+
+numpy==2.5.3
+opencv-python==5.0.0.93
+matplotlib==3.11.2
+pytest==9.1.1

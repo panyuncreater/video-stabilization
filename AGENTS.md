@@ -1,0 +1,283 @@
+# AGENTS.md —— 数据结构课程大作业：从零实现视频抖动去除（电子稳像）
+
+> **版本 v2**（2026-09-24 依据全量审查修订，共处置 28 项发现；修订清单与确认记录见第十六节）。
+
+## 一、角色
+
+你是一名资深计算机视觉工程师，带我完成「数据结构课程大作业：从零实现视频抖动去除（电子稳像）」。我是需求方与验收方，你负责设计、编码、测试与文档。所有代码、注释、报告素材使用简体中文。
+
+## 二、项目目标
+
+- 输入：一段手持抖动视频（mp4）；输出：稳定后视频 + 量化评估数据（metrics.json）+ 可视化图表。
+- 运动模型：**2D 相似变换（平移 + 旋转 + 等比缩放，4 自由度）**。不使用全仿射（6 自由度含剪切），原因：剪切分量在物理上不对应手持抖动，且无法干净地分解到参数空间做逐维平滑。报告中需写明这一选型理由。
+- 核心算法模块全部自研，不调用现成高层封装（红线见第四节）。
+- 量化指标：ITF（帧间变换保真度）、裁剪率、失真值、稳定度，外加轨迹对比可视化（统一定义见第九节）。
+- 产出数据结构课程报告素材：每个关键数据结构的选型理由、复杂度分析与实测耗时对比。
+- 报告需包含**局限性讨论**（v2 新增）：ITF 的语义局限（「静相机 + 动目标」场景下帧间差 ≠ 不稳定）、4 自由度模型不含透视/视差、居中平滑引入 r = window//2 帧延迟（离线口径，不适用实时场景）。
+
+## 三、技术栈
+
+Python 3.10+，NumPy，OpenCV（**仅限**视频读写 / 色彩转换 / 绘制标注），Matplotlib，pytest。依赖在 requirements.txt 中**按实际环境精确锁定版本**（环境初始化时锁定；后续任何升级视同变更依赖，必须先问我）；新增任何依赖（含 pytest-cov 等工具类，见第十一节）必须先问我。
+
+## 四、硬性红线（违反任何一条即返工）
+
+1. **运动估计**：禁止调用 cv2.estimateAffinePartial2D / estimateAffine2D / findHomography / estimateRigidTransform。必须自研 RANSAC（随机采样、内点评分、自适应迭代次数全部手写）；模型求解允许使用 np.linalg.lstsq / np.linalg.svd。
+2. **图像补偿**：禁止在主实现中调用 cv2.warpAffine / warpPerspective / remap / **resize**。**所有几何重采样——包括裁剪后缩放回原分辨率（resize 即缩放矩阵的 warp 特例）——统一走自研 warp_frame**。必须自研逆向映射 + 双线性插值（NumPy 向量化，禁止逐像素 Python 循环）。cv2.warpAffine / cv2.resize 只允许出现在单元测试里作数值对照基准。
+3. **特征检测与跟踪**：最终版禁止调用 cv2.goodFeaturesToTrack / calcOpticalFlowPyrLK / cornerHarris / cornerSubPix。M0 阶段**仅允许临时调用 goodFeaturesToTrack / calcOpticalFlowPyrLK 两个函数**并标注 TODO(SELF-IMPL)；**cornerHarris / cornerSubPix 任何阶段均不豁免**——它们是 M1 自研对象的本体，豁免即失去 M1 的意义。M1 起全部替换为自研实现；自研实现允许在单元测试中用上述 cv2 函数作数值对照。
+4. **滤波与梯度**：主实现禁止调用 scipy.ndimage / cv2.filter2D / GaussianBlur / Sobel / boxFilter。平滑滤波与图像梯度计算自研（NumPy 向量化）；np.convolve 仅允许出现在单元测试作对照。
+5. **视频编解码**不重造轮子：只用 cv2.VideoCapture / VideoWriter。
+6. **基础线性代数**（SVD、伪逆、矩阵乘）用 NumPy，不自研。
+7. **数据结构**：环形缓冲、双堆必须**手写实现**（定长数组 + 头尾指针 / 数组 + 上浮下沉），禁止用 collections.deque、heapq 直接替代；二者只允许出现在单元测试作对照基准。（全量轨迹用可增长数组存储**不属于**「替代环形缓冲」：环形缓冲的职责是定长滑窗，见第六节 trajectory.py 说明。）
+
+## 五、阶段规划
+
+| 阶段 | 目标 | 放行标准 |
+|---|---|---|
+| M0 | 参考流水线全链路跑通：特征/光流可临时用 cv2（标 TODO，仅限红线 3 列出的两个函数），RANSAC、warp、平滑从本阶段起即自研 | 端到端输出稳定视频，无红线 1/2/4 违规 |
+| M1 | 自研 Harris 角点 + LK 光流替换 cv2 临时实现 | 角点/光流单元测试达标，全链路无 TODO；**合成视频上端到端 ITF 与稳定度相对 M0 不退化（差异 ≤ 2%）**（v2 新增回归门槛） |
+| M2 | 最终交付版：全部红线满足、指标验收达标、文档与报告素材齐套 | 通过第十一节全部验收基准 |
+
+## 六、目录与接口契约（未经我确认不得修改签名）
+
+```text
+src/
+  io_utils.py     视频读写封装（分辨率/帧率/编码器一致性检查）
+  features.py     detect_corners(gray, max_corners=500) -> (N,2) float32   # 自研 Harris
+  tracking.py     track_points(prev_gray, curr_gray, pts, win=15) -> (new_pts, status)  # 自研 LK
+  motion.py       estimate_similarity_ransac(src_pts, dst_pts, thresh=2.5, conf=0.99) -> (M 3x3, inlier_mask)
+  trajectory.py   TrajectoryBuffer：全量累积轨迹 C_t（可增长数组存储，供平滑/指标/可视化使用）；
+                  参数空间分解/重建工具；定长滑窗需求一律复用 ds/ring_buffer（环形缓冲不承载全量历史）
+  smoothing.py    MovingAverageSmoother / GaussianSmoother / MedianSmoother
+                  统一接口：__init__(window:int)；update(x:float)->float|None；flush()->list[float]
+  warp.py         warp_frame(img, M) -> out（M 为输入→输出正向映射，内部求逆采样）
+  crop.py         解析法黑边有效域 + 最大内接轴对齐矩形裁剪 + 经 warp_frame 缩放回原分辨率
+  metrics.py      itf / cropping_ratio / distortion / stability
+  visualize.py    轨迹对比曲线、指标柱状图（定义见第九节）
+ds/
+  ring_buffer.py  手写环形缓冲（定长数组）
+  heap.py         手写二叉堆（最大堆/最小堆，上浮下沉）
+  kdtree.py       （可选进阶）K-D 树
+tools/
+  make_synthetic.py  合成抖动视频生成器（规格见第十一节；输出视频 + 真值 JSON 到 data/synthetic/）
+  bench_ds.py        数据结构计时基准（口径见第十节；结果入 docs/）
+main.py           流水线入口：--input --output --smooth {ma|gauss|median} --window --max-corners
+                 --vis --clamp-tx --clamp-theta --clamp-ln-s --no-clamp
+tests/            每个自研模块的 pytest
+docs/             data_structures.md（数据结构报告素材）、实验数据、图表
+data/             test1.mp4（实拍验收视频，gitignore 不入库）；synthetic/（合成视频 + 真值 JSON）
+PROJECT_STATE.md  交接状态文件（模板见第十四节）
+README.md         环境安装、运行说明、结果复现步骤
+```
+
+**平滑口径（全文唯一口径，v2 定稿）**：
+
+- 平滑为**居中（非因果）**，输出延迟 r = window//2 帧；两遍离线架构（第七节）下可用。
+- `update(x_t)`：输入第 t 个值（0-based），返回 y_{t-r}；**t < r 时返回 None（延迟期无输出）**。头部 y_0..y_{r-1} 按部分窗口规则计算（见下）。
+- `flush()`：序列结束后调用一次，返回尾部 r 个值 y_{N-r}..y_{N-1}（部分窗口规则）。update + flush 的输出总数恰为 N。
+- **边界规则 = 部分窗口重归一**（v2 删除原 np.pad reflect 表述，避免与流式接口矛盾）：头部与尾部的部分窗口内，移动平均 / 高斯核权重在实际可得元素上重新归一；中值在可得元素上取，**元素为偶数个时取两中位数的均值——该情形仅出现在头/尾部分窗口**（完整窗口恒为奇数）。
+- 窗口为偶数时自动 +1 并记录日志。
+- `--window` 默认 31，建议范围 15–61。
+
+## 七、数据流数学约定（开工前先向我复述这套约定，确认无误再写代码）
+
+**帧编号（v2 全文统一 0-based）**：视频帧为 $I_0..I_{N-1}$，共 N 帧；下文所有指标求和区间以此为准。
+
+- $M_t$（$t = 1..N-1$）：把第 $t-1$ 帧坐标映射到第 $t$ 帧的 3x3 齐次相似变换矩阵（点对应关系 $p_t = M_t \, p_{t-1}$）。
+- 相机轨迹：$C_t = M_t \cdot C_{t-1}$，$C_0 = I$。
+- 平滑在参数空间进行：把每个 $C_t$ 分解为 $(t_x, t_y, \theta, \ln s)$ 四条累积曲线，逐维滤波后重建矩阵，得 $C_t^{\mathrm{smooth}}$。**注意：$\theta$ 序列滤波前必须做 np.unwrap 相位解缠，重建后取模回 $(-\pi, \pi]$**；对 $s$ 取对数是为了让乘法因素变为可加。
+- **漂移限幅（v2 新增）**：重建 $C_t^{\mathrm{smooth}}$ 前，对每维偏差 $\delta_t = p_t^{\mathrm{smooth}} - p_t$（$\theta$ 在解缠域）做截断：$|\delta_{t_x}|, |\delta_{t_y}| \le$ clamp_tx（默认 30 px）、$|\delta_\theta| \le$ clamp_theta（默认 3°）、$|\delta_{\ln s}| \le$ clamp_ln_s（默认 0.05）；超限截断到边界，截断事件计数写入 metrics.json；`--no-clamp` 可整体关闭。限幅从源头控制平滑轨迹相对原轨迹的漂移，是保障裁剪率 ≥ 0.85 的第一道闸。
+- 补偿矩阵：$B_t = C_t^{\mathrm{smooth}} \cdot C_t^{-1}$（$B_0 = I$）。
+- **warp 方向约定（关键，易错）**：`warp_frame(img, M)` 中 $M$ 表示「输入图像坐标 → 输出图像坐标」的正向变换，内部对 $M$ 求逆后做逆向映射采样，即 $out(x) = img(M^{-1} x)$。因此对第 $t$ 帧施加 `warp_frame(frame_t, B_t)` 后，原位于 $p_t$ 的内容出现在 $B_t \, p_t = C_t^{\mathrm{smooth}} \, C_t^{-1} \, p_t$，即平滑轨迹位置。
+- **单元测试对照时注意**：cv2.warpAffine 的 $M$ 是「输出 → 输入」约定，对照时应调用 `cv2.warpAffine(img, np.linalg.inv(M), ...)` 与 `warp_frame(img, M)` 比较。
+- 开工 sanity check：`warp_frame(img, I)` 输出与原图完全一致；纯平移 $(+5, 0)$ 时内容向右移动 5 px。
+- **架构约定（v2 新增）**：流水线为**两遍离线**。pass 1：读入全部帧，逐帧估计 $M_t$，累积全量轨迹与解析黑边信息；pass 2：在全量轨迹上做参数空间居中平滑 → 限幅 → 重建 $C_t^{\mathrm{smooth}}$ → 逐帧求 $B_t$ 补偿 warp → 统一裁剪与缩放 → 写盘。实现可自选「缓存全部帧」或「第二遍重读文件」，所选方案记录于 PROJECT_STATE.md。
+
+## 八、自研模块技术方案
+
+### 8.1 角点检测（features.py）
+
+Harris / Shi-Tomasi 简化实现：梯度用 NumPy 移位差分实现 3x3 Sobel 核（禁 cv2.Sobel）；结构张量各分量盒式滤波用滑窗和（向量化解卷积）；响应 $R = \lambda_{\mathrm{min}}$ 或 $R = \det(H) - k \, \mathrm{tr}(H)^2$（$k = 0.04$）；非极大值抑制用 np.sliding_window_view 滑窗取局部最大；阈值取 $0.01 \times R_{\mathrm{max}}$；取前 N 个点用 np.argpartition（平均 $O(N)$，报告里与全排序 $O(N \log N)$ 对比）。
+
+### 8.2 稀疏光流（tracking.py）
+
+单层 Lucas-Kanade（金字塔为可选加分项）：每个特征点 $15 \times 15$ 窗口，构建结构张量并解 2x2 正规方程（批量向量化，禁逐点 Python 循环求解）；迭代至多 20 次或位移增量 < 0.01 px 收敛。status 判定四条件（v2 补参考阈值，允许 ±50% 内调整、调整须记 STATE）：窗口结构张量最小特征值 $\lambda_{\min} > 10^{-4}$（梯度按 [0,1] 灰度、3x3 Sobel 尺度）；窗口平均光度残差 < 0.05（[0,1] 尺度）；累计位移不超出窗口半径（7 px）；点邻域不出图像边界。**合成验收的位移幅度约定 ≤ 5 px**（与第十一节合成规格一致）；若实拍视频实测跟踪成功率 < 70% 或 EPE 超标，金字塔从可选升级为必选（先记 STATE 再实施）。
+
+### 8.3 运动估计（motion.py）
+
+相似变换最小求解器：2 组点对应（复数法或直接线性求解）；**样本退化检验（v2 新增）**：两点间距 < 2 px 判退化，弃样重采。RANSAC 自适应迭代次数：
+
+$$k = \frac{\ln(1 - \mathrm{conf})}{\ln(1 - w^n)}$$
+
+其中 $w$ 为当前内点率、$n = 2$ 为最小样本数；$w^n \ge 1$ 时取 k = 1，分母为 0 时设上限 1000。内点判据为**二维欧氏距离** $\|\hat p - p\| <$ **thresh = 2.5 px**（σ = 1 px/坐标噪声下 2.5σ 判据保留真内点的概率约 95.6%，为 90% 召回线留出余量；v1 的 1.5 px 在该噪声模型下数学不可达，已修正）。全部内点上用最小二乘重新拟合（Umeyama 闭式解，去反射）。返回 3x3 齐次矩阵与内点掩码。
+
+### 8.4 轨迹平滑（smoothing.py）
+
+- 移动平均：环形缓冲 + 增量维护窗口和，单帧更新 $O(1)$。
+- 高斯平滑：手写高斯核（窗口 = window，$\sigma$ = window / 6 或显式参数），滑窗点积向量化；边界按部分窗口重归一（第六节口径）。
+- 中值滤波：手写双堆（最大堆 + 最小堆）+ 哈希表延迟删除；部分窗口内偶数个元素时取两中位均值。
+
+### 8.5 图像补偿（warp.py）
+
+输出网格坐标向量化生成，整体左乘 $M^{-1}$ 得采样坐标，双线性插值（四个邻近点权重用广播计算），越界采样填 0（黑边，交由 crop 模块处理）。
+
+### 8.6 裁剪（crop.py，v2 重写）
+
+- **黑边判定主用解析法**：每帧输出平面的有效域 = 输入图像矩形经 $B_t$ 作用的四边形（相似变换下为旋转/缩放矩形）；全片有效域 = 所有帧四边形之交集（凸多边形，半平面交或等价实现）。解析法不依赖图像内容，**不受夜景 / 暗场景 / 黑幕转场误判影响**。图像亮度统计仅作可选交叉验证（差异帧记 warning）。
+- 裁剪框：在交集凸多边形内取**最大内接轴对齐矩形**（课程级实现可接受，复杂度分析必须写入报告；朴素 $O(n^2)$ 可用但需注明）。
+- 统一裁剪后**经 warp_frame 以纯缩放矩阵重采样回原分辨率**（禁 cv2.resize，见红线 2）。
+- 「自适应」指裁剪框由全片有效域自动确定而非固定比例；与第七节漂移限幅联动控制所需裁剪量。
+- 裁剪率 < 0.85 时，先报告数据与我讨论，禁止擅自放大裁剪或降低标准。
+
+## 九、量化指标定义（计算口径以本节为准）
+
+- **ITF 主口径（v2 定稿：算在最终成片）**：
+
+$$\mathrm{ITF} = \frac{1}{N - 1} \sum_{t=1}^{N-1} \mathrm{PSNR}(I_t, \, I_{t-1})$$
+
+  PSNR 在灰度图上计算，$\mathrm{PSNR} = 10 \log_{10}(255^2 / \mathrm{MSE})$。原视频与稳定成片**同口径全帧计算**（成片已经裁剪缩放、无黑边，故无掩膜）；稳定成片 ITF 必须高于原视频。已知偏差：成片比原视频多经一次重采样，会轻微抬高稳定侧 ITF，作为局限性写入报告。
+- **ITF 辅助诊断口径（v2 新增）**：在未裁剪的 warp 中间序列上计算带掩膜 ITF（掩膜 = 解析有效域），记 `itf_warped_masked`，仅作诊断，不设验收线。
+- **裁剪率**：$r = S_{\mathrm{valid}} / S_{\mathrm{frame}}$，即自适应裁剪保留的有效面积占原画面面积之比，要求 $\geq 0.85$。
+- **失真值**：
+
+$$D = \frac{1}{N} \sum_{t=0}^{N-1} \left( |\ln s_t| + |\theta_t| \right)$$
+
+  其中 $(\theta_t, s_t)$ 从补偿矩阵 $B_t$ 的线性部分分解得到（$B_0 = I$，贡献 0）。失真值衡量补偿偏离纯平移的程度，纯平移时 $D = 0$，越小越好。**验收线（v2 新增）**：合成视频 $D \le 0.05$；实拍视频不设硬线，报告数值。
+- **稳定度（v2 改为逐维归一）**：设 $p_t = (t_x, t_y, \theta, \ln s)$ 为累积轨迹参数，逐维二阶差分能量 $E_{x,d} = \sum_t \left(\Delta^2 p_{x,t}[d]\right)^2$，则
+
+$$S = \frac{1}{4}\sum_{d} \left( 1 - \frac{E_{\mathrm{smooth},d}}{E_{\mathrm{raw},d}} \right)$$
+
+  逐维归一消除 px / rad / 无量纲的量纲混合（v1 直接混合相加，已修正）。$E_{\mathrm{raw},d} < 10^{-9}$ 的维度视为无抖动，该项记 0 并告警；$S \le 1$ 恒成立，$S < 0$ 表示平滑后更差，触发告警并写入已知问题。**验收线（v2 新增）**：合成视频 $S \ge 0.5$；实拍视频 $S > 0$。未归一的旧口径 $1 - E_{\mathrm{smooth}}/E_{\mathrm{raw}}$ 作为参考值一并报告。
+- **可视化定义（v2 新增）**：轨迹对比图 = 2×2 子图（$t_x, t_y, \theta, \ln s$），每图绘制 raw 轨迹（$C_t$ 分解）与平滑轨迹（$C_t^{\mathrm{smooth}}$ 分解）双曲线对比；可另附 $B_t$ 各维分解曲线。指标柱状图 = 原视频 vs 稳定视频的 ITF 与 S，另示裁剪率与 D。
+
+## 十、数据结构得分点（必须写进代码注释与 STATE 决策日志）
+
+| 数据结构 | 用途 | 复杂度 | 朴素方案对比 |
+|---|---|---|---|
+| 定长数组环形缓冲 | 平滑器滑窗 / 最近 k 帧轨迹缓存 | 入队/出队 $O(1)$，空间 $O(k)$ | 列表头部删除 $O(k)$ |
+| 滑窗 + 增量运行和 | 移动平均 | 单帧更新 $O(1)$ | 每次重算窗口和 $O(k)$ |
+| 手写双堆 + 延迟删除 | 滑窗中值 | 更新 $O(\log k)$，查询 $O(1)$ | 每次排序 $O(k \log k)$ |
+| np.argpartition（快速选择思想） | 角点响应取 Top-N | 平均 $O(N)$ | 全排序 $O(N \log N)$ |
+| 向量化滑窗点积 | 高斯平滑 | 每帧 $O(k)$，常数远小于逐点循环 | 逐点 Python 循环（实测加速比入报告） |
+| K-D 树（可选进阶） | 特征匹配加速 | 查询约 $O(\log N)$ | 暴力匹配 $O(N^2)$ |
+
+**实测耗时对比口径（v2 新增）**：基准脚本 tools/bench_ds.py；time.perf_counter 计时、每配置预热 3 轮、重复 ≥ 5 取中位、固定随机种子；结果（表格 + 计时曲线）输出到 docs/ 并写入课程报告。
+
+每个结构在源码注释与 docs/data_structures.md 中写明：功能、实现要点、时间/空间复杂度、替代方案、选型理由，并附**实测耗时对比**（如移动平均 $O(1)$ 增量更新 vs 朴素 $O(k)$ 重算的计时曲线），这是课程报告的核心素材。
+
+## 十一、测试与数值验收基准
+
+**合成数据规格（v2 明确）**：由 tools/make_synthetic.py 生成，默认种子 42，输出到 data/synthetic/（视频 + 真值 JSON：逐帧 $M_t$ 与 $C_t$）。
+
+- **合成视频**：960×540，200 帧；背景为结构化纹理（棋盘 + 几何图形，保证角点密度）；轨迹 = 低频慢漂移 + 高频抖动（白噪声经高斯核平滑后生成）；帧间平移 ≤ 5 px、旋转增量 ≤ 0.5°、尺度增量 ≤ 0.005；累积范围：平移 ±40 px、旋转 ±3°、尺度 0.95–1.05。
+- **RANSAC 合成点对**：200 组；空间均匀分布于以原点为中心的 400×400 区域（保证旋转可观测性）；真值相似变换 + 每坐标 σ = 1 px 高斯噪声 + 30% 均匀外点（偏移幅度 5–20 px）；附真值内外点掩码（用于召回计算）。
+
+验收基准：
+
+- **warp 对照**：与 cv2.warpAffine 同输入同变换，**排除最外 2 px 边界环带后 PSNR ≥ 40 dB**（v2 修正口径）；边界环带差异（差异像素占比）单独报告。
+- **RANSAC**：平移误差 < 0.5 px，旋转误差 < 0.5°，**内点召回 ≥ 90%**（v2 定义：召回 = 被判为内点的真内点数 / 真内点总数；thresh = 2.5 px）。
+- **角点检测**：合成角点图（真值已知）检出率 ≥ 95%，定位误差 ≤ 1 px。
+- **LK 光流**：合成位移 ≤ 5 px 前提下端点误差 EPE < 0.3 px；可选与 cv2.calcOpticalFlowPyrLK 对照，中位差异 < 0.5 px。
+- **平滑器**：移动平均 / 中值 / 高斯与朴素遍历实现（**同一部分窗口边界规则**）逐值一致（v2 补高斯基准；相对容差 1e-9）；双堆中值与 sorted 取中值对照一致。
+- **最终成片（v2 明确验收集）**：**合成视频与 data/test1.mp4 双份**均须满足：ITF 高于原视频、S 达标（合成 ≥ 0.5 / 实拍 > 0）、裁剪率 ≥ 0.85、输出分辨率与帧率与输入一致。
+- pytest 全绿；核心模块（ds/、smoothing、motion、warp，**M1 完成后含 features、tracking**）覆盖率 ≥ 80%（v2 扩大清单）。覆盖率测量工具（pytest-cov 或 coverage）属新增依赖，**须先经我确认方可加入 requirements.txt**。
+- 实测不达标时，先报告数据再与我一起分析，禁止擅自降低标准。
+
+## 十二、异常处理规则（v2 补退出码与终止行为）
+
+- **退出码**：0 成功；1 输入视频打不开 / 帧读取失败 / CLI 参数错误；2 跟踪连续 ≥ 5 帧失败终止；3 输出封装一致性检查（分辨率 / 帧率 / 编码器）失败；4 内部断言失败（不应出现）。
+- **非零退出行为**：不产出 metrics.json；已部分写盘的输出视频删除并在 stderr 报告（删除失败则保留并报告路径）。
+- 视频打不开 / 帧读取失败：明确报错并以退出码 1 终止。
+- 某帧角点数 < 20：自动降低 Harris 阈值重检一次；仍不足则该帧 $M_t = I$，记录 warning。
+- RANSAC 内点数 < 6：该帧沿用 $M_{t-1}$，记录 warning；连续 ≥ 5 帧失败则终止并报告（退出码 2）。
+- 跟踪存活点数 < 30：在下一帧重新检测角点。
+- 任何异常降级都必须在 PROJECT_STATE.md 与最终报告的「已知问题」中体现，禁止静默吞掉。
+
+## 十三、会话协议（每次对话必须执行）
+
+1. 会话开始：读取 PROJECT_STATE.md（**首次会话允许直接创建**；项目尚无代码时 pytest 基线跳过，并在 STATE 记录「基线：无代码」——v2 补首次会话例外），再用不超过 5 行向我复述：已完成模块 / 当前模块 / 本次任务 / 已知风险。
+2. 列出本次计划与验收方式，等我确认后再动手。
+3. 模块完成标准 DoD：代码完成 + pytest 通过 + 数值对照达标 + PROJECT_STATE.md 已更新，四者缺一不算完成。
+4. 任何偏离本文档的决策（改接口、换算法、加依赖、动红线）必须先停下来问我。
+5. 会话结束：更新 PROJECT_STATE.md（本次改动、测试结果、遗留问题、下一步、决策日志），输出变更摘要并提醒我 git commit；若你判断上下文将尽，优先保证 STATE 已更新再收尾。
+
+## 十四、PROJECT_STATE.md 模板
+
+```markdown
+# PROJECT_STATE
+更新时间：
+当前阶段：M0 / M1 / M2
+## 已完成模块（含验收数值）
+## 当前模块
+## 本次任务
+## 已知风险
+## 本次改动（文件级清单）
+## 测试结果（pytest 摘要 + 数值对照表）
+## 遗留问题
+## 下一步
+## 决策日志（数据结构选型理由 / 偏离 AGENTS.md 的记录及确认人）
+```
+
+## 十五、交付物清单
+
+src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_STATE.md、docs/data_structures.md、docs/ 下的轨迹对比图与指标柱状图、稳定后视频、metrics.json。
+
+**metrics.json 字段（v2 定义）**：
+
+```json
+{
+  "input": "data/test1.mp4",
+  "output": "output/stabilized.mp4",
+  "n_frames": 200,
+  "fps": 30.0,
+  "width": 960,
+  "height": 540,
+  "smoother": {"type": "gauss", "window": 31, "latency_frames": 15},
+  "clamp": {"enabled": true, "tx_px": 30, "theta_deg": 3.0, "ln_s": 0.05, "events": 0},
+  "metrics": {
+    "itf_original_db": 0.0,
+    "itf_stabilized_db": 0.0,
+    "itf_warped_masked_db": 0.0,
+    "cropping_ratio": 0.0,
+    "distortion": 0.0,
+    "stability": {
+      "E_raw": [0, 0, 0, 0],
+      "E_smooth": [0, 0, 0, 0],
+      "S_per_dim": [0, 0, 0, 0],
+      "S": 0.0,
+      "S_reference_unnormalized": 0.0
+    }
+  },
+  "degradations": {"mt_identity_frames": 0, "ransac_fallback_frames": 0, "redetection_frames": 0},
+  "runtime_sec": {"pass1": 0.0, "pass2": 0.0}
+}
+```
+
+## 十六、修订记录（v2，2026-09-24）
+
+依据同日全量审查（28 项发现：A 数学/验收硬伤 4、B 前后矛盾 4、C 定义不清 7、D 缺失 10、E 设计建议 3），经用户授权按审查推荐项修订。**六项重大决策**：① 架构定两遍离线（pass1 估计轨迹 / pass2 补偿写盘）；② RANSAC thresh 1.5→2.5 px 并定义召回口径；③ ITF 主口径定为最终成片 + 掩膜口径降为辅助诊断；④ 帧编号统一 0-based；⑤ 验收集定为合成视频 + data/test1.mp4 双份；⑥ cv2.resize 并入红线 2。
+
+| 修订 | 依据 |
+|---|---|
+| 帧编号统一 0-based，各指标求和区间显式化 | A4 |
+| RANSAC thresh 修正 + 召回定义 + 样本退化检验 | A1 / C7 |
+| 稳定度逐维归一 + 退化保护 + S<0 告警；失真值/稳定度补验收线 | A2 / D1 |
+| ITF 定为成片主口径，掩膜口径降为辅助诊断 | A3 |
+| 平滑口径定稿：居中 + update/flush 接口 + 部分窗口边界，删 np.pad reflect | B1 / B2 |
+| M0 豁免粒度收紧（cornerHarris / cornerSubPix 不豁免） | B3 |
+| 轨迹对比可视化定义补入第九节 | B4 |
+| 两遍离线架构写入第七节；TrajectoryBuffer 职责澄清 | C1 / C2 |
+| crop 改解析法有效域 + 最大内接轴对齐矩形 + 经 warp_frame 缩放 | C3 |
+| cv2.resize 并入红线 2 | C4 |
+| warp 对照排除 2 px 边界环带 | C5 |
+| LK status 参考阈值 + 合成位移幅度约定 + 金字塔升级触发条件 | C6 |
+| metrics.json schema 定义 | D2 |
+| 合成数据规格完整定义；验收集定为双份 | D3 / D4 |
+| 覆盖率清单补 features / tracking；测量工具列为待确认依赖 | D5 |
+| 高斯平滑对照基准 + 第十节表格补行 | D6 |
+| bench_ds.py 计时口径 | D7 |
+| 退出码定义与非零终止行为 | D8 |
+| 首次会话协议例外（STATE 创建 / 无代码基线） | D9 |
+| --window 默认值、requirements 锁定说明、data/ 布局 | D10 |
+| 漂移限幅机制（--clamp-*，默认开启） | E1 |
+| M1 端到端回归门槛 | E2 |
+| 报告局限性讨论要求 | E3 |
