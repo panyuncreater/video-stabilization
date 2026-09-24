@@ -94,13 +94,28 @@ pip freeze | grep -iE "^(numpy|opencv-python|matplotlib|pytest)=="
 
 把实际版本回写 requirements.txt，并在 PROJECT_STATE.md 记录一次。
 
-## 三、运行方式（M0 交付后生效）
+## 三、运行方式（M0 已可用）
 
 ```bash
-python main.py --input data/test1.mp4 --output output/stabilized.mp4 --smooth gauss --window 31 --max-corners 500 --vis
+python main.py --input data/test1.mp4 --output output/test1/stabilized.mp4 --smooth gauss --window 31 --max-corners 500 --vis
 ```
 
-`--smooth {ma|gauss|median}` 选平滑器；`--window` 平滑窗口（默认 31）；`--vis` 输出轨迹对比图与指标图。M0 完成前此命令不可用。
+- `--smooth {ma|gauss|median}` 平滑器；`--window` 平滑窗口（默认 31，偶数自动 +1）；`--max-corners` 角点数（默认 500）；`--vis` 输出轨迹对比图与指标柱状图到 docs/。
+- `--clamp-tx / --clamp-theta / --clamp-ln-s` 漂移限幅（默认 30 px / 3° / 0.05），`--no-clamp` 关闭。
+- 产物：稳定视频 + 同目录 `metrics.json`（§15 字段），`--vis` 图在 docs/。
+- 退出码（§12）：0 成功；1 输入错误；2 连续 5 帧估计失败；3 输出封装不一致；4 内部错误。
+
+合成数据（验收用）：
+
+```bash
+python tools/make_synthetic.py          # 种子 42，输出到 data/synthetic/
+```
+
+数据结构计时基准（§10 报告素材）：
+
+```bash
+python tools/bench_ds.py                # 输出到 docs/bench_ds.json 与 docs/bench_ds.png
+```
 
 > **数据说明**：`data/test1.mp4`（11 MB）不入库。克隆仓库后如需实拍验收，请手动获取该文件放入 `data/`；无该文件时可仅用合成视频验收（`tools/make_synthetic.py` 生成）。
 

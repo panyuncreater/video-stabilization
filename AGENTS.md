@@ -88,7 +88,7 @@ README.md         环境安装、运行说明、结果复现步骤
 - **漂移限幅（v2 新增）**：重建 $C_t^{\mathrm{smooth}}$ 前，对每维偏差 $\delta_t = p_t^{\mathrm{smooth}} - p_t$（$\theta$ 在解缠域）做截断：$|\delta_{t_x}|, |\delta_{t_y}| \le$ clamp_tx（默认 30 px）、$|\delta_\theta| \le$ clamp_theta（默认 3°）、$|\delta_{\ln s}| \le$ clamp_ln_s（默认 0.05）；超限截断到边界，截断事件计数写入 metrics.json；`--no-clamp` 可整体关闭。限幅从源头控制平滑轨迹相对原轨迹的漂移，是保障裁剪率 ≥ 0.85 的第一道闸。
 - 补偿矩阵：$B_t = C_t^{\mathrm{smooth}} \cdot C_t^{-1}$（$B_0 = I$）。
 - **warp 方向约定（关键，易错）**：`warp_frame(img, M)` 中 $M$ 表示「输入图像坐标 → 输出图像坐标」的正向变换，内部对 $M$ 求逆后做逆向映射采样，即 $out(x) = img(M^{-1} x)$。因此对第 $t$ 帧施加 `warp_frame(frame_t, B_t)` 后，原位于 $p_t$ 的内容出现在 $B_t \, p_t = C_t^{\mathrm{smooth}} \, C_t^{-1} \, p_t$，即平滑轨迹位置。
-- **单元测试对照时注意**：cv2.warpAffine 的 $M$ 是「输出 → 输入」约定，对照时应调用 `cv2.warpAffine(img, np.linalg.inv(M), ...)` 与 `warp_frame(img, M)` 比较。
+- **单元测试对照时注意**：OpenCV ≤ 4 的 cv2.warpAffine 是「输出 → 输入」约定（对照需传 np.linalg.inv(M)）；**本环境锁定的 OpenCV 5.0.0 已改为「输入 → 输出」正向约定**（内部求逆采样，2026-09-24 实测确认），对照时直接传 `M[:2]` 即可。测试代码按 OpenCV 5 行为编写；若降级到 OpenCV ≤ 4 需同步调整对照调用。
 - 开工 sanity check：`warp_frame(img, I)` 输出与原图完全一致；纯平移 $(+5, 0)$ 时内容向右移动 5 px。
 - **架构约定（v2 新增）**：流水线为**两遍离线**。pass 1：读入全部帧，逐帧估计 $M_t$，累积全量轨迹与解析黑边信息；pass 2：在全量轨迹上做参数空间居中平滑 → 限幅 → 重建 $C_t^{\mathrm{smooth}}$ → 逐帧求 $B_t$ 补偿 warp → 统一裁剪与缩放 → 写盘。实现可自选「缓存全部帧」或「第二遍重读文件」，所选方案记录于 PROJECT_STATE.md。
 
