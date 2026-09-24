@@ -6,7 +6,8 @@ import numpy as np
 
 sys.path.insert(0, ".")
 from src.shots import (INLIER_RATIO_THRESHOLD, MAD_THRESHOLD, MIN_SHOT_LEN,
-                       collapse_shots, frame_mad, is_cut, segment_shots)
+                       SURVIVAL_RATIO_THRESHOLD, collapse_shots, frame_mad, is_cut,
+                       segment_shots)
 
 
 def _frame(seed: int, shift: int = 0, h: int = 120, w: int = 160) -> np.ndarray:
@@ -45,6 +46,14 @@ def test_cut_requires_high_mad_and_low_inlier_ratio():
     assert is_cut(40.0, 0.10, 100) is True          # 切换：帧差大 + 运动不一致
     assert is_cut(40.0, 0.80, 100) is False         # 甩镜：帧差大但运动一致 → 不切
     assert is_cut(3.0, 0.05, 100) is False          # 平滑运动 + 低内点率 → 不切
+
+
+def test_cut_detected_by_tracking_collapse_even_if_consistent():
+    """胶片扫描场景：静态结构（齿孔/片框）使切换帧内点率仍高，但存活率崩溃。"""
+    assert is_cut(42.4, 0.80, 500) is False              # 仅内点率高 → 不切
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.10) is True   # 存活崩溃 → 切
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.90) is False  # 存活正常 → 不切（甩镜）
+    assert SURVIVAL_RATIO_THRESHOLD == 0.25
 
 
 def test_min_shot_length_blocks_dense_cuts():

@@ -1,8 +1,9 @@
 """视频稳像流水线入口（AGENTS.md §6/§7）。
 
 两遍离线架构（§7 架构约定）：
-- pass 1：读入全部帧，逐帧估计 M_t（M0 特征/光流临时用 cv2，标 TODO(SELF-IMPL)），
-  累积全量轨迹 C_t，并流式计算原视频 ITF；
+- pass 1：读入全部帧，逐帧估计 M_t（特征/光流已自研：src/features.py Harris、
+  src/tracking.py 单层 LK；M0 阶段的 cv2 临时实现与 TODO(SELF-IMPL) 已全部移除），
+  累积全量轨迹 C_t（含镜头切分），并流式计算原视频 ITF；
 - pass 2：全量轨迹参数空间居中平滑 → 锚定 → 限幅 → 重建 C^smooth → 逐帧 B_t 补偿
   warp（重读文件）→ 统一裁剪 → 经 warp 采样核缩放回原分辨率 → 写盘；
   最后计算指标、（--vis）出图、写 metrics.json（与输出视频同目录）。
@@ -92,6 +93,7 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
 
         new_pts, status = tracking.track_points(prev_gray, gray, points)
         alive = int(status.sum())
+        survival_ratio = float(alive) / float(len(points)) if len(points) else 1.0
         if alive >= 2:
             M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status])
             inlier_ratio = float(inl.sum()) / float(alive)
@@ -99,11 +101,11 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
             M, inl = None, np.zeros(0, dtype=bool)
             inlier_ratio = 0.0
 
-        # 方案①：镜头切换检测（MAD 高 且 运动不一致 且 距上次切换 ≥ 最短镜头长度）
+        # 方案①：镜头切换检测（MAD 高 且 「运动不一致 或 跟踪存活崩溃」 且 最短镜头长度）
         mad = shots.frame_mad(prev_gray, gray)
-        if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut):
-            logger.info("检测到镜头切换 @帧 %d（MAD=%.1f，内点率=%.2f），新镜头起算轨迹",
-                        frame_idx, mad, inlier_ratio)
+        if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut, survival_ratio):
+            logger.info("检测到镜头切换 @帧 %d（MAD=%.1f，内点率=%.2f，存活率=%.2f），新镜头起算轨迹",
+                        frame_idx, mad, inlier_ratio, survival_ratio)
             deg["shot_cuts"].append(frame_idx)
             traj.start_new_shot()
             traj.append(np.eye(3))     # 切换帧 M_t = I，新镜头起点 C = I
