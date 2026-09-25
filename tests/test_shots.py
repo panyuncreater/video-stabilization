@@ -6,7 +6,8 @@ import numpy as np
 
 sys.path.insert(0, ".")
 from src.shots import (INLIER_RATIO_THRESHOLD, MAD_THRESHOLD, MIN_SHOT_LEN,
-                       SURVIVAL_RATIO_THRESHOLD, collapse_shots, frame_mad, is_cut,
+                       PROBE_SURVIVAL_THRESHOLD, SURVIVAL_RATIO_THRESHOLD,
+                       collapse_shots, frame_mad, is_cut, probe_cut_evidence,
                        segment_shots)
 
 
@@ -63,6 +64,54 @@ def test_min_shot_length_blocks_dense_cuts():
 
 def test_inlier_ratio_boundary():
     assert is_cut(40.0, INLIER_RATIO_THRESHOLD, 100) is False  # 等于阈值不算切
+
+
+# ---------- 无状态探针（KNOWN_ISSUES #11 根治） ----------
+
+def _checker(h: int = 120, w: int = 160, block: int = 20,
+             base: int = 40, alt: int = 200) -> np.ndarray:
+    """棋盘纹理：角点密度高且位置精确，适合考查探针的存活率取证。"""
+    yy, xx = np.mgrid[0:h, 0:w]
+    return ((((yy // block) + (xx // block)) % 2) * (alt - base) + base).astype(np.uint8)
+
+
+def test_probe_crashes_on_scene_cut():
+    """切换帧新鲜全集存活率崩溃（< 探针崩溃线）。"""
+    prev = _checker(block=20)
+    curr = _checker(block=13)          # 不同结构 = 不同场景
+    surv, inl = probe_cut_evidence(prev, curr)
+    assert surv is not None and surv < PROBE_SURVIVAL_THRESHOLD, surv
+
+
+def test_probe_survives_stable_scene():
+    """同场景微平移：新鲜全集存活率正常（≥ 探针崩溃线）。"""
+    prev = _checker(block=20)
+    curr = np.roll(prev, 3, axis=1)
+    surv, inl = probe_cut_evidence(prev, curr)
+    assert surv is not None and surv >= PROBE_SURVIVAL_THRESHOLD, surv
+
+
+def test_probe_returns_none_without_corners():
+    """平坦图无角点：返回 (None, None)，调用方回退当前点集证据。"""
+    flat = np.full((120, 160), 128, np.uint8)
+    surv, inl = probe_cut_evidence(flat, flat)
+    assert surv is None and inl is None
+
+
+def test_is_cut_probe_rescues_degenerate_tracking_set():
+    """#11 回归：退化点集（存活 0.58、内点 0.80）两路证据失效 → 漏判；
+    探针（新鲜全集）存活崩溃 → 检出（对应 test1 帧 880 实测分布）。"""
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.58) is False
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.58,
+                  probe_survival=0.12, probe_inlier=0.80) is True
+
+
+def test_is_cut_probe_not_triggered_on_consistent_motion():
+    """甩镜（运动一致）：探针存活正常 → 不切；探针存活率恰等于崩溃线也不切。"""
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.58,
+                  probe_survival=0.72, probe_inlier=0.90) is False
+    assert is_cut(42.4, 0.80, 500, survival_ratio=0.58,
+                  probe_survival=PROBE_SURVIVAL_THRESHOLD) is False
 
 
 # ---------- 分段 ----------

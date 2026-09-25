@@ -4,7 +4,7 @@
 
 核心算法（RANSAC、Harris 角点、LK 光流、图像 warp、环形缓冲、双堆中值等）全部自研，禁止调用 OpenCV 高层封装——完整约束、接口契约与验收基准见 [AGENTS.md](AGENTS.md)。
 
-**当前状态**：M1 已完成（自研 Harris + 单层 LK 替换 cv2 临时实现），pytest 54 passed，合成与实拍双份四项指标全部达标。下一步 M2（验收收口与报告素材定稿）。
+**当前状态**：**M2 验收达成（交付就绪）**——§11 全部 22 项验收基准通过（对照表见 docs/RESULTS.md），pytest 59 passed / 覆盖率 98%，合成与实拍双份四项指标全部达标，遗留问题清零。剩余交付：课程报告成稿（素材已齐）。
 
 ## 文档中心（`docs/`）
 
@@ -16,7 +16,7 @@
 | [docs/API.md](docs/API.md) | 模块接口签名、CLI、metrics.json 结构、退出码 |
 | [docs/data_structures.md](docs/data_structures.md) | 数据结构选型、复杂度、实测耗时（课程报告素材） |
 | [docs/TESTS.md](docs/TESTS.md) | 测试清单与验收映射 |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | 已知问题、根因、解决方案与待决策项 |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | 已知问题、根因与解决方案（当前无待决项） |
 | [docs/RESULTS.md](docs/RESULTS.md) | 端到端指标、产物路径、复现步骤 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 环境搭建、命令、Git/编码约定、红线自检 |
 | [PROJECT_STATE.md](PROJECT_STATE.md) | 交接状态（每次会话必读必更新） |
@@ -27,7 +27,7 @@
 |---|---|
 | 操作系统 | Windows 10/11（Linux / macOS 亦适用） |
 | Python | 3.10+（3.12 / 3.13 均可） |
-| 第三方依赖 | 仅 4 个：numpy、opencv-python、matplotlib、pytest（版本锁定见 requirements.txt） |
+| 第三方依赖 | 共 5 个直依赖：numpy、opencv-python、matplotlib、pytest、pytest-cov（版本锁定见 requirements.txt） |
 
 > 未安装 Python 时，从 https://www.python.org/downloads/ 下载安装并勾选 **Add python.exe to PATH**。
 
@@ -96,22 +96,22 @@ pip install --no-index --find-links=wheels -r requirements.txt
 ### 第 5 步：验证安装
 
 ```bash
-python -c "import numpy, cv2, matplotlib, pytest; print(numpy.__version__, cv2.__version__, matplotlib.__version__, pytest.__version__)"
+python -c "import numpy, cv2, matplotlib, pytest, pytest_cov; print(numpy.__version__, cv2.__version__, matplotlib.__version__, pytest.__version__, pytest_cov.__version__)"
 ```
 
-四个版本号正常打印即安装成功。
+五个版本号正常打印即安装成功（pytest_cov 随 pytest 自动加载，`--cov` 参数可用即证明生效）。
 
 ### 第 6 步：版本回写（项目约定）
 
 AGENTS.md 约定依赖按实际环境精确锁定。安装成功后核对实际版本，若与 requirements.txt 不一致（Git Bash）：
 
 ```bash
-pip freeze | grep -iE "^(numpy|opencv-python|matplotlib|pytest)=="
+pip freeze | grep -iE "^(numpy|opencv-python|matplotlib|pytest|pytest-cov|coverage)=="
 ```
 
 把实际版本回写 requirements.txt，并在 PROJECT_STATE.md 记录一次。
 
-## 三、运行方式（M0 已可用）
+## 三、运行方式（M1 + v2.3 已可用：全自研特征/光流 + 镜头切分探针）
 
 ```bash
 python main.py --input data/test1.mp4 --output output/test1/stabilized.mp4 --smooth gauss --window 31 --max-corners 500 --vis
@@ -141,21 +141,24 @@ python tools/bench_ds.py                # 输出到 docs/bench_ds.json 与 docs/
 完整指标、产物路径与复现步骤见 [docs/RESULTS.md](docs/RESULTS.md)。要点：
 
 ```bash
-python -m pytest tests/ -q                       # 期望 54 passed
+python -m pytest tests/ -q                       # 期望 59 passed
 python main.py --input data/synthetic/synthetic_shaky.mp4 \
                --output output/synthetic/stabilized.mp4 --smooth gauss --window 31 --vis
 python main.py --input data/test1.mp4 \
                --output output/test1/stabilized.mp4 --smooth gauss --window 31 --vis
 ```
 
-| 指标（最新 M1） | 合成视频 | test1.mp4 | 验收线 |
+| 指标（v2.3 最终回归） | 合成视频 | test1.mp4 | 验收线 |
 |---|---|---|---|
-| ITF 提升 | +3.10 dB | +0.65 dB | 高于原视频 |
-| 稳定度 S | 0.8081 | 0.9996 | 合成 ≥0.5 / 实拍 >0 |
-| 裁剪率 | 0.963 | 0.981 | ≥0.85 |
-| 失真值 D | 0.00675 | 0.00179 | 合成 ≤0.05 |
+| ITF 提升 | +3.10 dB | +0.69 dB | 高于原视频 ✅ |
+| 稳定度 S | 0.8081 | 0.9996 | 合成 ≥0.5 / 实拍 >0 ✅ |
+| 裁剪率 | 0.963 | 0.972 | ≥0.85 ✅ |
+| 失真值 D | 0.00675 | 0.00193 | 合成 ≤0.05 ✅ |
+| 切换检出 | 0（单镜头，探针零误触发） | 4/4（[508, 809, 880, 1263]） | — |
 
-已知问题与待决策项见 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)。
+覆盖率：`python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（核心模块总体 98%，§11 验收线 ≥80%）。
+
+已知问题与解决方案见 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)（遗留问题已全部收口，当前无待决项）。
 
 ## 五、常见问题排查
 
@@ -172,4 +175,4 @@ python main.py --input data/test1.mp4 \
 
 - 开发机 CMD / PowerShell 中 `python` 解析到 msys2 的 Python 3.12.11，用它执行 `python -m venv` 会生成 `bin/` 布局且**没有 activate.bat**（CMD 无法激活）。该机上建 venv 需使用完整路径：`C:/Users/v/.workbuddy/binaries/python/versions/3.13.12/python.exe -m venv .venv`（CPython 3.13，标准 Scripts/ 布局）。
 - 开发机代理端口为 7897；该机网络实测：阿里云镜像可用，清华镜像与官方源不可用。
-- 开发机已实装验证：numpy 2.5.3 / opencv-python 5.0.0.93 / matplotlib 3.11.2 / pytest 9.1.1（2026-09-24，阿里云镜像）。
+- 开发机已实装验证：numpy 2.5.3 / opencv-python 5.0.0.93 / matplotlib 3.11.2 / pytest 9.1.1 / pytest-cov 7.1.0（coverage 7.16.1）（2026-09-24/25，阿里云镜像）。

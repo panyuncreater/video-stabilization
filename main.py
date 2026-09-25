@@ -10,6 +10,9 @@
 
 异常降级（§12）：角点 <20 降阈值重检、RANSAC 内点 <6 沿用 M_{t-1}（连续 5 帧退出码 2）、
 存活 <30 重新检测；非零退出不产出 metrics.json 并删除部分输出。
+镜头切换（§12 v2.3）：MAD>25 候选帧上由 shots.probe_cut_evidence 无状态探针（上一帧现检
+角点 + 单步跟踪的新鲜全集）独立取证，与当前跟踪点集证据取或——根治点集退化导致的
+切换假阴性（根因与标定见 src/shots.py 模块 docstring）。
 """
 
 from __future__ import annotations
@@ -102,10 +105,17 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
             inlier_ratio = 0.0
 
         # 方案①：镜头切换检测（MAD 高 且 「运动不一致 或 跟踪存活崩溃」 且 最短镜头长度）
+        # 点集退化根治（KNOWN_ISSUES #11）：MAD 候选帧上用无状态探针（新鲜全集）独立取证，
+        # 与当前跟踪点集（可能已退化为跨场景静态结构）两路证据取或
         mad = shots.frame_mad(prev_gray, gray)
-        if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut, survival_ratio):
-            logger.info("检测到镜头切换 @帧 %d（MAD=%.1f，内点率=%.2f，存活率=%.2f），新镜头起算轨迹",
-                        frame_idx, mad, inlier_ratio, survival_ratio)
+        p_surv, p_inl = (None, None)
+        if mad > shots.MAD_THRESHOLD:
+            p_surv, p_inl = shots.probe_cut_evidence(prev_gray, gray, args.max_corners)
+        if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut, survival_ratio,
+                        p_surv, p_inl):
+            probe_note = f"，探针存活率={p_surv:.2f}" if p_surv is not None else ""
+            logger.info("检测到镜头切换 @帧 %d（MAD=%.1f，内点率=%.2f，存活率=%.2f%s），新镜头起算轨迹",
+                        frame_idx, mad, inlier_ratio, survival_ratio, probe_note)
             deg["shot_cuts"].append(frame_idx)
             traj.start_new_shot()
             traj.append(np.eye(3))     # 切换帧 M_t = I，新镜头起点 C = I

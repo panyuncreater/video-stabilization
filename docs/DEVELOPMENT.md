@@ -7,7 +7,7 @@
 | 项 | 值 |
 |---|---|
 | Python | 3.10+（本项目实测 3.13.14） |
-| 依赖（锁定） | numpy 2.5.3、opencv-python 5.0.0.93、matplotlib 3.11.2、pytest 9.1.1 |
+| 依赖（锁定） | numpy 2.5.3、opencv-python 5.0.0.93、matplotlib 3.11.2、pytest 9.1.1、pytest-cov 7.1.0（传递依赖 coverage 7.16.1，2026-09-25 经用户批准新增） |
 | 操作系统 | Windows 10/11（Linux/macOS 亦可，激活脚本路径不同） |
 
 ## 二、环境搭建
@@ -44,7 +44,8 @@ pip install --no-index --find-links=wheels -r requirements.txt
 
 | 目的 | 命令 |
 |---|---|
-| 单元测试 | `python -m pytest tests/ -q`（期望 54 passed） |
+| 单元测试 | `python -m pytest tests/ -q`（期望 59 passed） |
+| 覆盖率测量 | `python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（核心模块总体 98%，§11 验收线 ≥80%） |
 | 合成数据 | `python tools/make_synthetic.py`（种子 42） |
 | 稳像运行 | `python main.py --input <mp4> --output <mp4> --smooth gauss --window 31 --vis` |
 | 计时基准 | `python tools/bench_ds.py` |

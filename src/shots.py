@@ -16,6 +16,19 @@
 
 实测依据：MAD 中位 2.25 / P99 13.2，切换帧（508/809/880/1263）MAD 34–42，
 与次高值 13.6 之间有 2.5 倍空档；切换帧存活率 0.10 vs 常态 0.95 以上。
+
+无状态探针复核（2026-09-25 新增，KNOWN_ISSUES #11 根治，用户批准）：
+  长期跟踪的点集会逐步退化——存活 ≥30 即不重检测，存活者偏向前景消失后仍存在的
+  跨场景静态结构（齿孔/片框/暗部平坦区），到切换帧时存活率仅降到 ~0.55（不达 0.25
+  崩溃线）、内点率仍 0.8+，两路证据同时失效——这正是 508/809/880 漏判的根因
+  （「存活 30/304 = 0.099」是新鲜全集的诊断数字，退化点集永远到不了）。
+  修复：MAD > 25 的候选帧上调用 probe_cut_evidence（上一帧现检角点 + 单步跟踪，
+  新鲜全集）独立取证，判据改为两路证据取或——任一触发即判切换。
+  探针崩溃线 0.45 标定（LK 残差 0.05、max_corners=500，test1 实测，取间隔中点）：
+  切换帧探针存活率 0.099–0.237，常态帧 0.656–1.000。
+  注意：放宽 LK 残差阈值会使切换帧探针存活率抬升（0.05→0.075 时 809 处
+  0.146→0.402，暗部平坦区假存活点），两处参数存在交互——重调 LK 阈值后须重标探针线
+  （2026-09-25 实验：0.075 使 test1 ITF 增益 +0.650→+0.614，证伪后已回退 0.05）。
 """
 
 from __future__ import annotations
@@ -23,10 +36,15 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from src.features import detect_corners
+from src.motion import estimate_similarity_ransac
+from src.tracking import track_points
+
 MAD_THRESHOLD = 25.0           # 帧间灰度平均绝对差阈值
 INLIER_RATIO_THRESHOLD = 0.30  # RANSAC 内点率上限（低于此说明运动不一致）
 SURVIVAL_RATIO_THRESHOLD = 0.25  # 跟踪存活比例下限（低于此说明跟踪崩溃）
 MIN_SHOT_LEN = 12              # 最短镜头长度（帧）
+PROBE_SURVIVAL_THRESHOLD = 0.45  # 探针（新鲜全集）存活崩溃线，标定依据见模块 docstring
 
 
 def frame_mad(prev_gray: np.ndarray, curr_gray: np.ndarray) -> float:
@@ -35,14 +53,45 @@ def frame_mad(prev_gray: np.ndarray, curr_gray: np.ndarray) -> float:
     return float(np.abs(diff).mean())
 
 
+def probe_cut_evidence(prev_gray: np.ndarray, curr_gray: np.ndarray,
+                       max_corners: int = 500) -> tuple[float | None, float | None]:
+    """无状态切换取证：在 prev_gray 现检角点并单步跟踪到 curr_gray（新鲜全集）。
+
+    根治长期跟踪点集退化（见模块 docstring）：新鲜全集在切换帧存活率崩溃
+    （实测 0.099–0.237 < 0.45 崩溃线），而退化点集的 ~0.55 无法触发 0.25 线。
+    返回 (存活率, 内点率)；角点不足 2 个（极端退化素材）返回 (None, None)，
+    调用方回退当前跟踪点集证据。仅在 MAD 候选帧调用，全片代价可忽略。
+    """
+    pts = detect_corners(prev_gray, max_corners)
+    if len(pts) < 2:
+        return None, None
+    new_pts, status = track_points(prev_gray, curr_gray, pts)
+    alive = int(status.sum())
+    survival = alive / len(pts)
+    if alive >= 2:
+        _, inl = estimate_similarity_ransac(pts[status], new_pts[status])
+        inlier = float(inl.sum()) / alive
+    else:
+        inlier = 0.0
+    return survival, inlier
+
+
 def is_cut(mad: float, inlier_ratio: float, frames_since_last_cut: int,
-           survival_ratio: float = 1.0) -> bool:
+           survival_ratio: float = 1.0, probe_survival: float | None = None,
+           probe_inlier: float | None = None) -> bool:
     """是否判定为镜头切换。
 
     survival_ratio = 跟踪存活点数 / 上一帧特征点数（无跟踪时传 1.0，表示无崩溃证据）。
+    probe_survival / probe_inlier = 无状态探针证据（probe_cut_evidence 的返回值，可选）；
+    两路证据取或：当前跟踪点集（可能已退化为跨场景静态结构）或探针（新鲜全集）
+    任一触发「运动不一致 / 跟踪崩溃」即计入。
     """
-    motion_inconsistent = inlier_ratio < INLIER_RATIO_THRESHOLD
-    tracking_collapsed = survival_ratio < SURVIVAL_RATIO_THRESHOLD
+    motion_inconsistent = (inlier_ratio < INLIER_RATIO_THRESHOLD
+                           or (probe_inlier is not None
+                               and probe_inlier < INLIER_RATIO_THRESHOLD))
+    tracking_collapsed = (survival_ratio < SURVIVAL_RATIO_THRESHOLD
+                           or (probe_survival is not None
+                               and probe_survival < PROBE_SURVIVAL_THRESHOLD))
     return (mad > MAD_THRESHOLD
             and (motion_inconsistent or tracking_collapsed)
             and frames_since_last_cut >= MIN_SHOT_LEN)

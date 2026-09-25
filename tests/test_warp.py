@@ -70,6 +70,7 @@ def test_compare_cv2_random_similarity_psnr():
     rng = np.random.default_rng(42)
     img = _texture(200, 300)
     psnrs = []
+    band_diffs = []   # §11：边界环带差异像素占比（单独报告，不设验收线）
     for _ in range(20):
         ang = np.deg2rad(rng.uniform(-3, 3))
         s = rng.uniform(0.95, 1.05)
@@ -80,6 +81,14 @@ def test_compare_cv2_random_similarity_psnr():
         ref = cv2.warpAffine(img, M[:2].copy(), (img.shape[1], img.shape[0]))
         # 排除最外 2px 边界环带后比较
         psnrs.append(_psnr(mine[2:-2, 2:-2], ref[2:-2, 2:-2]))
+        # 环带差异像素占比：外圈 2px 内两者不相等的像素比例（边界填充/坐标舍入差异所在）
+        band_m = np.concatenate([mine[:2].ravel(), mine[-2:].ravel(),
+                                  mine[2:-2, :2].ravel(), mine[2:-2, -2:].ravel()])
+        band_r = np.concatenate([ref[:2].ravel(), ref[-2:].ravel(),
+                                 ref[2:-2, :2].ravel(), ref[2:-2, -2:].ravel()])
+        band_diffs.append(float(np.mean(band_m != band_r)))
+    print(f"\n20 组变换：排除 2px 环带后 PSNR min={min(psnrs):.2f} dB；"
+          f"环带差异像素占比 中位={np.median(band_diffs):.4f} max={max(band_diffs):.4f}（§11 单独报告项）")
     assert min(psnrs) >= 40.0, f"PSNR 过低: {min(psnrs):.2f} dB"
 
 

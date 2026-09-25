@@ -10,12 +10,25 @@
 | `tests/test_warp.py` | 7 | `src/warp.py` |
 | `tests/test_smoothing.py` | 9 | `src/smoothing.py` |
 | `tests/test_motion.py` | 6 | `src/motion.py` |
-| `tests/test_shots.py` | 11 | `src/shots.py` |
+| `tests/test_shots.py` | 16 | `src/shots.py` |
 | `tests/test_features.py` | 9 | `src/features.py` |
 | `tests/test_tracking.py` | 4 | `src/tracking.py` |
-| **合计** | **54** | — |
+| **合计** | **59** | — |
 
-最近结果：**54 passed**（2026-09-25，M1 后）。
+最近结果：**59 passed**（2026-09-25，v2.3 探针 + LK 残差实验回退 0.05 后）。
+
+**覆盖率（§11 验收线 ≥80%，2026-09-25 实测，pytest-cov）**：
+
+| 模块 | 覆盖率 |
+|---|---|
+| ds/heap.py / src/tracking.py | 100% |
+| src/smoothing.py / src/warp.py | 98% |
+| src/motion.py | 97% |
+| src/features.py | 96% |
+| ds/ring_buffer.py | 95% |
+| **总体** | **98%** |
+
+测量命令：`python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（pytest-cov 已经用户批准加入 requirements.txt）。
 
 ## 二、各文件要点
 
@@ -27,7 +40,7 @@
 ### test_warp.py（图像补偿）
 
 - §7 sanity check：`warp_frame(img, I)` 与原图**逐像素一致**；纯平移 (+5,0) 内容右移 5 px（切面精确相等）；负向/纵向平移同理；越界填 0 校验。
-- §11 对照：20 组随机相似变换与 `cv2.warpAffine(img, M[:2])` 比较，**排除最外 2 px 环带后 PSNR ≥ 40 dB**（光滑纹理实测 PSNR = inf）。
+- §11 对照：20 组随机相似变换与 `cv2.warpAffine(img, M[:2])` 比较，**排除最外 2 px 环带后 PSNR ≥ 40 dB**（噪声纹理 2026-09-25 实测 min = 82.34 dB）；**环带差异像素占比单独报告**（中位 0.0000 / 最大 0.0005，`-s` 运行可见）。
 - 彩色图像路径；`resample` 缩放与 `cv2.resize` 对照（半像素中心对齐一致）。
 
 ### test_smoothing.py（轨迹平滑）
@@ -42,10 +55,11 @@
 - 多种子稳健性：10 组种子下旋转与召回每次达标、平移取中位达标（尾部风险见 KNOWN_ISSUES）。
 - 无噪精确恢复；退化样本（间距 <2 px）拒绝；去反射（det>0）；点数不足返回 `(None, 全 False)`。
 
-### test_shots.py（镜头切分）
+### test_shots.py（镜头切分 + 无状态探针）
 
 - MAD：同帧为 0；连续帧（渐变图微移）低于阈值、切换帧（异场景）高于阈值。
 - 判据：高 MAD + 低内点率 → 切；高 MAD + 高内点率 → 不切（甩镜）；**高 MAD + 高内点率 + 存活率崩溃 → 切**（胶片静态结构补丁）；最短镜头长度生效；阈值边界。
+- **无状态探针（KNOWN_ISSUES #11 根治）**：探针在切换帧（异构棋盘）存活率崩溃、在同场景微移帧存活正常、平坦图无角点返回 `(None, None)`；`is_cut` 用探针证据救援退化点集（存活 0.58/内点 0.80 漏判 → 探针 0.12 检出，对应 test1 帧 880 实测分布）；甩镜下探针证据不误触发、恰等于崩溃线不触发。
 - 分段：边界正确、无切换、越界切换帧忽略；过短镜头合并。
 
 ### test_features.py（自研 Harris）

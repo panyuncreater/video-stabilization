@@ -1,66 +1,88 @@
 # PROJECT_STATE
-更新时间：2026-09-25 08:45
-当前阶段：**M1 完成 + 文档体系建立**；下一步 M2（验收收口、报告素材定稿、结果复现固化）
+更新时间：2026-09-25 10:06
+当前阶段：**M2 验收达成（交付就绪）**——§11 全部 22 项验收基准通过（对照表见 docs/RESULTS.md 第五节）；剩余交付仅课程报告成稿
 
 ## 已完成模块（含验收数值）
 - ds/ring_buffer.py、ds/heap.py：手写环形缓冲 / 双堆；与 deque、heapq 随机操作对拍一致。
-- src/warp.py：恒等逐像素一致；与 cv2.warpAffine（OpenCV 5 正向约定）对照 PSNR = inf（排除 2 px 环带 ≥40 dB）；越界逐点填 0；uint8 走 float32 + 网格缓存。
+- src/warp.py：恒等逐像素一致；与 cv2.warpAffine（OpenCV 5 正向约定）对照排除 2 px 环带后 20 组随机变换 min PSNR = 82.34 dB（≥40 dB），环带差异占比中位 0.0000/最大 0.0005；越界逐点填 0；uint8 走 float32 + 网格缓存。
 - src/smoothing.py：三平滑器（居中 + flush + 部分窗口重归一），与朴素实现逐值一致（1e-9）；双堆延迟删除正确。
 - src/motion.py：自研 RANSAC（复数法最小解 + 退化检验 + Umeyama 重拟合）；§11 验收平移 <0.5 px / 旋转 <0.5° / 召回 ≥90%（200 次蒙特卡洛达标率 100%/100%/100%）。
-- src/features.py（**M1 自研 Harris**）：§11 验收检出率 1.000、定位误差 0.000 px。
-- src/tracking.py（**M1 自研单层 LK**）：§11 验收 EPE 0.0004–0.14 px、跟踪成功率 1.000、与 cv2 中位差异 0.0009 px。
-- src/shots.py（v2.1 方案①）：镜头切分（MAD + 内点率 + 存活率 + 最短镜头）；单测 11 项。
+- src/features.py（M1 自研 Harris）：§11 验收检出率 1.000、定位误差 0.000 px。
+- src/tracking.py（M1 自研单层 LK）：§11 验收 EPE 0.0004–0.14 px、跟踪成功率 1.000、与 cv2 中位差异 0.0009 px；RESIDUAL_MAX 维持 0.05（0.075 实验证伪，见决策日志）。
+- src/shots.py（v2.1 方案① + **v2.3 无状态探针**）：镜头切分（MAD + 内点率/存活率/探针存活率三线，两路证据取或）；test1 切换 **4/4 检出 [508, 809, 880, 1263]**；单测 16 项。
 - src/io_utils.py / trajectory.py（镜头重置）/ crop.py（解析法 + 复合重采样）/ metrics.py（S 逐镜头聚合）/ visualize.py（切换标注 + 中文字体）。
 - tools/make_synthetic.py（§11 规格 + 真值 JSON）、tools/bench_ds.py（§10 计时基准）。
-- main.py：两遍离线流水线 + CLI + §12 降级规则与退出码 0–4。
-- **文档体系（v2.2）**：docs/README（索引）、ARCHITECTURE、API、data_structures、TESTS、KNOWN_ISSUES、RESULTS、DEVELOPMENT；README 增文档索引与结果摘要；AGENTS.md 增第十七节文档体系与 v2.2 修订记录。
+- main.py：两遍离线流水线 + CLI + §12 降级规则与退出码 0–4；MAD 候选帧探针接入。
+- 文档体系（v2.2）+ v2.3 修订：AGENTS.md §12/§16、docs/ 全量同步（README、ARCHITECTURE、API、TESTS、KNOWN_ISSUES、RESULTS）。
 
-## 端到端指标（最新，M1）
+## 端到端指标（最新，v2.3 最终回归）
 | 指标 | 合成视频 | test1.mp4 | 验收线 |
 |---|---|---|---|
-| ITF | 24.503 → 27.601（+3.098） | 30.163 → 30.813（+0.650） | 高于原视频 ✅ |
-| 稳定度 S | 0.8081（M0 0.815，−0.85%） | 0.9996 | 合成 ≥0.5 / 实拍 >0 ✅ |
-| 裁剪率 | 0.9629 | 0.9810 | ≥0.85 ✅ |
-| 失真值 D | 0.00675 | 0.00179 | 合成 ≤0.05 ✅ |
-| 降级 | 0 | 重检测 3 次 | — |
-| 切换检出 | 0（单镜头正确） | [1263] | — |
-| 耗时 | pass1 14.7 s / pass2 37.7 s | pass1 103 s / pass2 681 s | — |
+| ITF | 24.503 → 27.601（+3.098） | 30.163 → 30.850（+0.687） | 高于原视频 ✅ |
+| 稳定度 S | 0.8081 | 0.9996（5 镜头加权） | 合成 ≥0.5 / 实拍 >0 ✅ |
+| 裁剪率 | 0.9629 | 0.9718 | ≥0.85 ✅ |
+| 失真值 D | 0.00675 | 0.00193 | 合成 ≤0.05 ✅ |
+| 限幅触发 | 0 | 0 | — |
+| 降级 | 0 | 重检测 2 次 | — |
+| 切换检出 | 0（单镜头，探针零误触发） | [508, 809, 880, 1263]（4/4） | — |
+| 耗时 | pass1 13.3 s / pass2 36.1 s | pass1 102 s / pass2 634 s | — |
 
 ## 当前模块
-- 文档体系维护；M2 待启动。
+- M2 验收收口已完成；无进行中代码模块。
 
 ## 本次任务
-- 系统更新全部项目文档至最新状态（架构、API、数据结构报告素材、测试说明、已知问题、结果复现、开发环境），并校正 PROJECT_STATE 中的过期条目；补充 AGENTS.md §15/§16/§17 与 README 文档索引。
+- **M2 验收收口（用户指令「继续推进」）**：§11 全部验收基准逐项核对并固化为对照表（docs/RESULTS.md 第五节，22 项全绿）；补齐两处缺口——warp 边界环带差异占比单独报告（§11 明文要求，此前未量化）与输出视频分辨率/帧率/帧数一致性显式核对（双份 PASS）；requirements 锁定完整性验证（pip freeze 六项一致）；修正历史记录（warp 对照 PSNR「inf」→ 实测 82.34 dB）。
+- §5 M2 放行标准三项全部满足：红线满足（自检通过）、指标验收达标（22/22）、文档与报告素材齐套。**M2 达成**。
 
 ## 已知风险
-- **切换检测假阴性（待决策）**：M1 下仅检出 1263，MAD 实测切换点 508/809/880 未命中——跟踪点集退化到齿孔/片框等跨场景静态结构。不影响当前验收（裁剪率 0.981、S 0.9996）。候选方案与代价见 docs/KNOWN_ISSUES.md #11。
-- **M1 实拍 ITF 提升弱于 M0**（+0.65 vs +1.30 dB，待决策）：自研 LK 在暗调胶片筛选更保守。候选：残差阈值、Shi-Tomasi λ_min、金字塔（见 KNOWN_ISSUES #19）。
-- **覆盖率工具待确认依赖**（pytest-cov / coverage），依 §3 需用户同意后方可加入。
+- （已消除）切换假阴性、ITF 差距待决、覆盖率工具待批——三项遗留全部收口，KNOWN_ISSUES 无待定项。
+- 探针崩溃线（0.45）与 LK 残差阈值存在**参数交互**（放宽残差会使切换帧探针存活 0.237→0.402，判别间隔收窄）——后续若重调 LK 阈值必须重标探针线（shots.py docstring 已注明）。
 - Python 常数因子使 RingBuffer / 双堆在小 k 慢于 C 实现对照——非缺陷，报告须如实呈现（见 data_structures.md）。
+- M0 与 M1 的 ITF 差距（+1.30 vs +0.687）归因金字塔 LK，留作课程加分项，报告局限性章节如实说明。
 
 ## 本次改动（文件级清单）
-- 新增 docs/README.md、ARCHITECTURE.md、API.md、data_structures.md、TESTS.md、KNOWN_ISSUES.md、RESULTS.md、DEVELOPMENT.md
-- README.md：新增文档索引、状态、结果摘要与复现命令
-- AGENTS.md：§15 交付物补充文档体系；§16 增 v2.2 修订记录（M1 + 判据补丁 + 文档体系）；新增 §17 文档体系表
-- PROJECT_STATE.md：全面校正（测试数 54、M1 完成、文档齐套、遗留更新）
+
+**本会话（M2 验收收口）**：
+- tests/test_warp.py：`test_compare_cv2_random_similarity_psnr` 补 §11 要求的「边界环带差异像素占比」报告输出（20 组变换环带内 mine≠ref 占比，中位/最大打印；不断言、不设线）。
+- docs/RESULTS.md：新增「五、§11 验收对照表（M2 收口）」22 项全绿；单元测试验收表 warp 行修正为实测 82.34 dB + 环带占比；结论补 M2 达成判定。
+- docs/TESTS.md：test_warp 说明同步实测值与环带报告项。
+- PROJECT_STATE.md / README.md / docs/README.md：阶段推进至 M2 达成。
+- AGENTS.md：§16 增 v2.4 修订记录（M2 验收收口）。
+
+**前次会话（文档全面审查，纯文档/注释，无算法与接口变更）**：
+- docs/ARCHITECTURE.md：模块依赖表 `shots.py` 补探针依赖（features/tracking/motion，无循环依赖）；mermaid 架构图 B4 节点标注「MAD>25 候选帧触发无状态探针取证」。
+- docs/DEVELOPMENT.md：依赖表补 pytest-cov 7.1.0 / coverage 7.16.1；常用命令 54→59 passed，新增覆盖率测量命令行。
+- README.md：KNOWN_ISSUES 描述与结尾改为「当前无待决项」；第 5 步安装验证含 pytest_cov、第 6 步 pip freeze 正则补 pytest-cov/coverage；「三、运行方式（M0 已可用）」→「（M1 + v2.3 已可用）」；结果复现表 test1 列由「见 RESULTS」改为实测值（+0.69 / 0.9996 / 0.972 / 0.00193）并新增切换检出行（4/4）。
+- docs/API.md：metrics.json 示例整体更新为 v2.3 实测输出（5 镜头 / 4 切换 / itf 30.850 / crop 0.9718 / S_whole_sequence 0.282 / redetection 2 / runtime 102.5+633.5），补双口径与合成单镜头说明；实现状态行 M1→M1+v2.3。
+- docs/README.md：KNOWN_ISSUES 阅读项「当前无待决项」；「关键约定速查」新增探针崩溃线 × LK 残差阈值参数交互警示（重调须重标 + 重跑双份回归）。
+- main.py：模块 docstring 补镜头切换探针机制说明（纯注释，无代码逻辑改动）。
+- PROJECT_STATE.md：本会话记录。
+
+**上一会话（v2.3 遗留收口）**：
+- src/shots.py：新增 `probe_cut_evidence`；`is_cut` 增加可选探针证据参数（两路取或）；`PROBE_SURVIVAL_THRESHOLD=0.45`；模块 docstring 补根因与标定数据。
+- src/tracking.py：RESIDUAL_MAX 0.05→0.075→0.05（实验过程与证伪数据记入注释）。
+- main.py：pass 1 在 MAD>25 候选帧调用探针取证并传入 is_cut；切换日志增探针存活率。
+- tests/test_shots.py：新增探针测试 5 项（切换崩溃 / 常态存活 / 无角点 None / 退化点集救援回归 / 甩镜不误触发），11→16 项。
+- requirements.txt：新增 pytest-cov==7.1.0、coverage==7.16.1（用户批准）。
+- AGENTS.md：§12 补无状态探针机制；§16 增 v2.3 修订记录。
+- docs/API.md、ARCHITECTURE.md、TESTS.md、KNOWN_ISSUES.md、RESULTS.md、docs/README.md、README.md：同步至 v2.3。
+- 中间实验产物已清理（output/*/stabilized_lk075.mp4、基线备份 json）。
 
 ## 测试结果（pytest 摘要 + 数值对照表）
-- pytest **54 passed**（ds 8 / warp 7 / smoothing 9 / motion 6 / shots 11 / features 9 / tracking 4）。
-- warp vs cv2：PSNR = inf（光滑纹理）；identity 逐像素一致；(+5,0) 右移 5 px 精确。
-- 平滑器 vs 朴素：1e-9 容差全组合通过（含 window>N、偶数窗口、window=1、显式 sigma）。
-- RANSAC §11 验收 + 多种子稳健性全过。
-- 角点 / 光流 §11 验收全过（详见 docs/TESTS.md）。
-- 端到端：合成与 test1 双份出片，指标见上表。
+- 本会话（M2 收口）验证：pytest **59 passed**；§11 对照表 22 项全绿（docs/RESULTS.md 第五节）；warp 环带差异占比实测中位 0.0000 / 最大 0.0005（20 组变换）；输出一致性双份 PASS（合成 960×540@30×200、test1 1280×976@24×1440，输入=输出=metrics 记录）；pip freeze 与 requirements.txt 六项完全一致。
+- 前次会话（文档审查）验证：红线自检 grep（src/、ds/ 禁用 API / deque / heapq / TODO）命中全部为注释性说明文字，无实际调用；全库过期引用复扫归零。
+- pytest **59 passed**（ds 8 / warp 7 / smoothing 9 / motion 6 / shots 16 / features 9 / tracking 4）。
+- 覆盖率（pytest-cov）：总体 **98%**——heap/tracking 100%、smoothing/warp 98%、motion 97%、features 96%、ring_buffer 95%。
+- 探针标定（LK 0.05，test1 实测）：切换帧 0.099/0.146/0.237/0.147 vs 常态帧 0.656–1.000。
+- #19 实验（LK 0.075）：合成回归与基线完全一致；test1 ITF +0.614（基线 +0.650）→ 证伪回退。
+- 最终双份回归：合成与基线完全一致（+3.098 / 0.8081 / 0.9629 / 0.00675 / 切换 0）；test1 见上表，4/4 切换检出、四项达标。
 
 ## 遗留问题
-1. 切换检测假阴性是否继续调优（用户决定）。
-2. M1 实拍 ITF 提升是否调优（用户决定）。
-3. 覆盖率工具依赖是否新增（用户决定）。
-4. M2：报告素材定稿（`docs/data_structures.md` 已具雏形，需与最终报告排版对齐）、README 结果复现固化。
+- 无待决事项。M2 报告素材提示：点集退化机制、两参数交互（LK 残差 × 探针线）、0.075 实验的证伪过程，均是「先报告数据再决策」的良好报告案例。
 
 ## 下一步
-1. 用户确认后开始 M2：按 §11 全套验收清单逐项核对并固化数据；补齐 README 结果复现细节；必要时重跑双份回归。
-2. （可选，待用户决定）调优切换判据或 LK 阈值，并同步重跑合成 + test1 双份回归。
+1. **课程报告成稿**（最后交付项，用户主导、AI 协助整理）：素材已齐——数据结构五要素与实测耗时（docs/data_structures.md）、选型理由与架构（ARCHITECTURE.md）、实验数据（RESULTS.md 三列对比 + 验收对照表）、局限性讨论与已知问题（KNOWN_ISSUES）、「先报告数据再决策」案例（点集退化根治、0.075 证伪实验）。
+2. （可选加分项，用户未要求）金字塔 LK：若后续决定追平 M0 的 ITF，按 §8.2 实施并重过全套验收；K-D 树无应用场景，维持不实现。
 
 ## 决策日志（数据结构选型理由 / 偏离 AGENTS.md 的记录及确认人）
 - 2026-09-24：AGENTS.md v1 全量审查（28 项发现）→ 用户授权按推荐项修订为 v2，六项重大决策（两遍架构 / thresh=2.5+召回定义 / ITF 成片主口径 / 0-based / 双验收集 / resize 入红线）。确认人：用户。
@@ -78,3 +100,8 @@
 - 2026-09-25：**M1（v2.2）自研特征/光流落地**，cv2 临时实现与 TODO 全部移除；盒式滤波 k=5→3（响应峰定位修正）。确认人：AI 实现（含实测依据，已记 KNOWN_ISSUES #1）。
 - 2026-09-25：**切换判据补丁**：MAD>25 且（内点率<0.30 或 存活率<0.25）。确认人：AI 实测修订（判据细化，不动验收线）。
 - 2026-09-25：**文档体系建立（v2.2）**：8 份文档 + README/AGENTS 同步，确保新会话可零提问接手。确认人：用户（本次任务指令）。
+- 2026-09-25：**v2.3 #11 无状态探针**（用户批准方案）：MAD>25 候选帧 `probe_cut_evidence` 新鲜全集取证，崩溃线 0.45（切换帧 0.099–0.237 vs 常态 0.656–1.000 取中点）；`is_cut` 两路证据取或；test1 切换 4/4 检出、ITF +0.687、裁剪率 0.9718。AGENTS §12/§16 同步。确认人：用户。
+- 2026-09-25：**v2.3 #19 LK 残差实验**：0.05→0.075（用户批准实验）→ test1 ITF +0.614 vs 基线 +0.650 证伪 → **回退 0.05 + 差距文档化**（用户二次决策）；归因 M0 金字塔 LK，记 KNOWN_ISSUES #19 非缺陷。注意与探针线的参数交互。确认人：用户（两次）。
+- 2026-09-25：**v2.3 #20 覆盖率工具**：新增 pytest-cov 7.1.0 + coverage 7.16.1 依赖（用户批准）；核心模块覆盖率 98%（≥80% 达标）。确认人：用户。
+- 2026-09-25：**文档系统全面审查**（用户指令）：全量文档同步至 v2.3，修复 7 处过期内容（依赖表/指标示例/阶段标注等），新接手 AI 零提问可接手。确认人：用户（本次任务指令）。
+- 2026-09-25：**M2 验收收口达成（v2.4）**：§11 全部 22 项基准通过（对照表固化于 docs/RESULTS.md 第五节）；补齐 warp 环带差异占比报告（中位 0.0000/最大 0.0005）与输出一致性双份核对（PASS）；修正 warp 对照历史记录（inf → 82.34 dB，旧值系早期纹理版本所测）。确认人：用户（「继续推进」指令授权 M2 收口）。

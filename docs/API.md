@@ -1,6 +1,6 @@
 # API 参考
 
-> 对应 AGENTS.md §6 接口契约。**签名未经用户确认不得修改**；下表为当前实现（M1 后）。
+> 对应 AGENTS.md §6 接口契约。**签名未经用户确认不得修改**；下表为当前实现（M1 + v2.3：自研特征/光流 + 无状态探针）。
 
 ## 约定
 
@@ -37,7 +37,7 @@
 | 名称 | 签名 | 说明 |
 |---|---|---|
 | `track_points` | `(prev_gray, curr_gray, pts, win=15) -> (new_pts (M,2) float32, status (M,) bool)` | 批量向量化，无逐点 Python 循环 |
-| 常量 | `MAX_ITERS=20`、`CONVERGE_EPS=0.01`、`LAMBDA_MIN=1e-4`、`RESIDUAL_MAX=0.05` | §8.2 允许 ±50% 调整（须记 STATE） |
+| 常量 | `MAX_ITERS=20`、`CONVERGE_EPS=0.01`、`LAMBDA_MIN=1e-4`、`RESIDUAL_MAX=0.05` | §8.2 参考值；2026-09-25 实验 0.075 证伪（ITF +0.614 vs +0.650）后维持 0.05 |
 
 status 为真的四条件：窗口结构张量 $\lambda_{min} > 10^{-4}$；平均光度残差 < 0.05；累计位移 ≤ 窗口半径（7 px）；点邻域不出界。
 
@@ -51,16 +51,17 @@ status 为真的四条件：窗口结构张量 $\lambda_{min} > 10^{-4}$；平�
 | `compose_matrix` | `(a, t) -> M 3x3` | — |
 | 常量 | `DEGENERATE_DIST=2.0`、`MAX_ITERS=1000` | 自适应迭代 $k=\ln(1-conf)/\ln(1-w^2)$ |
 
-## src/shots.py（镜头切分，v2.1）
+## src/shots.py（镜头切分，v2.1；v2.3 增无状态探针）
 
 | 名称 | 签名 | 说明 |
 |---|---|---|
-| `is_cut` | `(mad, inlier_ratio, frames_since_last_cut, survival_ratio=1.0) -> bool` | 三条件判据 |
+| `is_cut` | `(mad, inlier_ratio, frames_since_last_cut, survival_ratio=1.0, probe_survival=None, probe_inlier=None) -> bool` | 三条件判据；两路证据（当前点集 / 探针新鲜全集）取或 |
+| `probe_cut_evidence` | `(prev_gray, curr_gray, max_corners=500) -> (survival, inlier)`，角点 <2 时 `(None, None)` | 无状态切换取证（KNOWN_ISSUES #11 根治）：现检角点 + 单步跟踪，仅 MAD 候选帧调用 |
 | `frame_mad` | `(prev_gray, curr_gray) -> float` | 帧间灰度平均绝对差 |
 | `segment_shots` | `(cut_frames, n_frames) -> [(start, end)]` | end 为开区间 |
 | `collapse_shots` | `(shots, min_len=MIN_SHOT_LEN)` | 合并过短镜头 |
 | `shot_lengths` / `to_gray` | — | 辅助 |
-| 常量 | `MAD_THRESHOLD=25.0`、`INLIER_RATIO_THRESHOLD=0.30`、`SURVIVAL_RATIO_THRESHOLD=0.25`、`MIN_SHOT_LEN=12` | — |
+| 常量 | `MAD_THRESHOLD=25.0`、`INLIER_RATIO_THRESHOLD=0.30`、`SURVIVAL_RATIO_THRESHOLD=0.25`、`MIN_SHOT_LEN=12`、`PROBE_SURVIVAL_THRESHOLD=0.45` | 探针崩溃线标定（LK 残差 0.05）：切换帧探针存活 0.099–0.237 vs 常态 0.656–1.000，取间隔中点 |
 
 ## src/trajectory.py
 
@@ -154,18 +155,22 @@ python tools/bench_ds.py
   "input": "...", "output": "...", "n_frames": 1440, "fps": 24.0, "width": 1280, "height": 976,
   "smoother": { "type": "gauss", "window": 31, "latency_frames": 15 },
   "clamp": { "enabled": true, "tx_px": 30, "theta_deg": 3.0, "ln_s": 0.05, "events": 0 },
-  "shots": { "n_shots": 2, "cuts": [1263], "segments": [[0,1263],[1263,1440]] },
+  "shots": { "n_shots": 5, "cuts": [508, 809, 880, 1263],
+             "segments": [[0,508],[508,809],[809,880],[880,1263],[1263,1440]] },
   "metrics": {
-    "itf_original_db": 30.163, "itf_stabilized_db": 30.813, "itf_warped_masked_db": 30.65,
-    "cropping_ratio": 0.981, "cropping_ratio_ok": true,
-    "distortion": 0.00179,
+    "itf_original_db": 30.163, "itf_stabilized_db": 30.850, "itf_warped_masked_db": 30.702,
+    "cropping_ratio": 0.9718, "cropping_ratio_ok": true,
+    "distortion": 0.00193,
     "stability": { "E_raw": [...], "E_smooth": [...], "S_per_dim": [...], "S": 0.9996,
-                   "S_reference_unnormalized": ..., "S_whole_sequence": ...,
+                   "S_reference_unnormalized": 0.288, "S_whole_sequence": 0.282,
                    "degenerate_dims": [], "negative": false,
-                   "shots": [...], "n_shots_used": 2, "skipped_short_shots": 0 }
+                   "shots": [ { ...每镜头明细：E_raw/E_smooth/S_per_dim/S/S_reference_unnormalized/degenerate_dims/negative/start/end/n_frames... } ],
+                   "n_shots_used": 5, "skipped_short_shots": 0 }
   },
   "degradations": { "mt_identity_frames": 0, "ransac_fallback_frames": 0,
-                    "redetection_frames": 3, "shot_cuts": [1263] },
-  "runtime_sec": { "pass1": 103.1, "pass2": 680.8 }
+                    "redetection_frames": 2, "shot_cuts": [508, 809, 880, 1263] },
+  "runtime_sec": { "pass1": 102.5, "pass2": 633.5 }
 }
 ```
+
+> 数值为 v2.3 最终回归（test1.mp4，探针 4/4 检出）的实测输出；合成视频为单镜头（`cuts: []`、`n_shots: 1`）。`S_whole_sequence` 为整段参考口径（§9 v2.1 说明两种口径不可直接比较）。
