@@ -4,7 +4,7 @@
 
 核心算法（RANSAC、Harris 角点、LK 光流、图像 warp、环形缓冲、双堆中值等）全部自研，禁止调用 OpenCV 高层封装——完整约束、接口契约与验收基准见 [AGENTS.md](AGENTS.md)。
 
-**当前状态**：**M2 验收达成（交付就绪）**——§11 全部 22 项验收基准通过（对照表见 docs/RESULTS.md），pytest 59 passed / 覆盖率 98%，合成与实拍双份四项指标全部达标，遗留问题清零。剩余交付：课程报告成稿（素材已齐）。
+**当前状态**：**M2 验收达成（交付就绪）**——§11 全部 22 项验收基准通过（对照表见 docs/RESULTS.md），pytest 60 passed / 覆盖率 98%，合成与实拍双份四项指标全部达标，遗留问题清零。剩余交付：课程报告成稿（素材已齐）。
 
 ## 文档中心（`docs/`）
 
@@ -111,7 +111,7 @@ pip freeze | grep -iE "^(numpy|opencv-python|matplotlib|pytest|pytest-cov|covera
 
 把实际版本回写 requirements.txt，并在 PROJECT_STATE.md 记录一次。
 
-## 三、运行方式（M1 + v2.3 已可用：全自研特征/光流 + 镜头切分探针）
+## 三、运行方式（M1 + v2.5 已可用：全自研特征/光流 + 镜头切分探针 + 角点空间均匀化）
 
 ```bash
 python main.py --input data/test1.mp4 --output output/test1/stabilized.mp4 --smooth gauss --window 31 --max-corners 500 --vis
@@ -141,19 +141,19 @@ python tools/bench_ds.py                # 输出到 docs/bench_ds.json 与 docs/
 完整指标、产物路径与复现步骤见 [docs/RESULTS.md](docs/RESULTS.md)。要点：
 
 ```bash
-python -m pytest tests/ -q                       # 期望 59 passed
+python -m pytest tests/ -q                       # 期望 60 passed
 python main.py --input data/synthetic/synthetic_shaky.mp4 \
                --output output/synthetic/stabilized.mp4 --smooth gauss --window 31 --vis
 python main.py --input data/test1.mp4 \
                --output output/test1/stabilized.mp4 --smooth gauss --window 31 --vis
 ```
 
-| 指标（v2.3 最终回归） | 合成视频 | test1.mp4 | 验收线 |
+| 指标（v2.5 最终回归） | 合成视频 | test1.mp4 | 验收线 |
 |---|---|---|---|
-| ITF 提升 | +3.10 dB | +0.69 dB | 高于原视频 ✅ |
-| 稳定度 S | 0.8081 | 0.9996 | 合成 ≥0.5 / 实拍 >0 ✅ |
-| 裁剪率 | 0.963 | 0.972 | ≥0.85 ✅ |
-| 失真值 D | 0.00675 | 0.00193 | 合成 ≤0.05 ✅ |
+| ITF 提升 | +3.098 dB | +1.189 dB | 高于原视频 ✅ |
+| 稳定度 S | 0.8090 | 0.9967 | 合成 ≥0.5 / 实拍 >0 ✅ |
+| 裁剪率 | 0.9629 | 0.9685 | ≥0.85 ✅ |
+| 失真值 D | 0.00677 | 0.00187 | 合成 ≤0.05 ✅ |
 | 切换检出 | 0（单镜头，探针零误触发） | 4/4（[508, 809, 880, 1263]） | — |
 
 覆盖率：`python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（核心模块总体 98%，§11 验收线 ≥80%）。
