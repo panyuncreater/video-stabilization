@@ -56,7 +56,8 @@ def frame_mad(prev_gray: np.ndarray, curr_gray: np.ndarray) -> float:
 
 
 def probe_cut_evidence(prev_gray: np.ndarray, curr_gray: np.ndarray,
-                       max_corners: int = 500) -> tuple[float | None, float | None]:
+                       max_corners: int = 500,
+                       rng=None) -> tuple[float | None, float | None]:
     """无状态切换取证：在 prev_gray 现检角点并单步跟踪到 curr_gray（新鲜全集）。
 
     根治长期跟踪点集退化（见模块 docstring）：新鲜全集在切换帧存活率崩溃
@@ -71,7 +72,7 @@ def probe_cut_evidence(prev_gray: np.ndarray, curr_gray: np.ndarray,
     alive = int(status.sum())
     survival = alive / len(pts)
     if alive >= 2:
-        _, inl = estimate_similarity_ransac(pts[status], new_pts[status])
+        _, inl = estimate_similarity_ransac(pts[status], new_pts[status], rng=rng)
         inlier = float(inl.sum()) / alive
     else:
         inlier = 0.0
