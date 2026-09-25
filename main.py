@@ -60,15 +60,13 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--no-diagnostic", action="store_true",
                     help="跳过纯诊断的中间 warp 与掩膜 ITF（加速 pass2；该量仅作辅助诊断，"
                          "不参与 §11 任何验收判据）")
-    ap.add_argument("--seed", type=int, default=42,
-                    help="RANSAC / 探针随机种子（默认 42；同一输入同一种子可逐位复现）")
     ap.add_argument("--pyramid", action="store_true",
                     help="启用自研金字塔 LK（§8.2 加分项，P4/A）。默认关闭以保持既有标定与"
                          "指标不变；启用后须重标探针崩溃线并重跑双份回归")
     return ap.parse_args()
 
 
-def pass1_estimate(args, reader: io_utils.VideoReader, rng):
+def pass1_estimate(args, reader: io_utils.VideoReader):
     """pass 1：逐帧估计 M_t，累积轨迹，流式计算原视频 ITF。返回轨迹与统计。"""
     traj = trajectory.TrajectoryBuffer()
     deg = {"mt_identity_frames": 0, "ransac_fallback_frames": 0,
@@ -117,8 +115,7 @@ def pass1_estimate(args, reader: io_utils.VideoReader, rng):
         alive = int(status.sum())
         survival_ratio = float(alive) / float(len(points)) if len(points) else 1.0
         if alive >= 2:
-            M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status],
-                                                       rng=rng)
+            M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status])
             inlier_ratio = float(inl.sum()) / float(alive)
         else:
             M, inl = None, np.zeros(0, dtype=bool)
@@ -130,8 +127,7 @@ def pass1_estimate(args, reader: io_utils.VideoReader, rng):
         mad = shots.frame_mad(prev_gray, gray)
         p_surv, p_inl = (None, None)
         if mad > shots.MAD_THRESHOLD:
-            p_surv, p_inl = shots.probe_cut_evidence(prev_gray, gray, args.max_corners,
-                                                     rng=rng)
+            p_surv, p_inl = shots.probe_cut_evidence(prev_gray, gray, args.max_corners)
         if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut, survival_ratio,
                         p_surv, p_inl):
             probe_note = f"，探针存活率={p_surv:.2f}" if p_surv is not None else ""
@@ -194,14 +190,11 @@ def smooth_trajectory(params_raw: np.ndarray, method: str, window: int) -> np.nd
 
 def run(args) -> int:
     t0 = time.perf_counter()
-    # 可复现性（2026-09-25 根因修复）：RANSAC 采样使用单一带种子 RNG 贯穿全链路。
-    # 此前 rng=None 时 motion 每次调用新建无种子生成器 → M_t 随机 → 成片不可复现。
-    rng = np.random.default_rng(args.seed)
 
     # ---------- pass 1 ----------
     with io_utils.VideoReader(args.input) as reader:
         fps, width, height = reader.fps, reader.width, reader.height
-        traj, deg, itf_orig_vals, n_frames = pass1_estimate(args, reader, rng)
+        traj, deg, itf_orig_vals, n_frames = pass1_estimate(args, reader)
     t1 = time.perf_counter()
 
     # ---------- 镜头分段（方案①） ----------
@@ -281,7 +274,6 @@ def run(args) -> int:
         "height": height,
         "smoother": {"type": args.smooth, "window": window_eff(args.window),
                      "latency_frames": window_eff(args.window) // 2},
-        "seed": args.seed,
         "diagnostic": {"masked_itf": not args.no_diagnostic},
         "clamp": {"enabled": not args.no_clamp, "tx_px": args.clamp_tx,
                   "theta_deg": args.clamp_theta, "ln_s": args.clamp_ln_s,

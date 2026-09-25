@@ -1,0 +1,19 @@
+{
+  "width": 960,
+  "height": 540,
+  "frames": 64,
+  "warmup": 3,
+  "repeat": 5,
+  "seed": 42,
+  "per_frame_ms": {
+    "diagnostic_warp": 69.40577968754269,
+    "crop_resample": 68.60017499997184,
+    "both": 139.1503765624975
+  },
+  "diagnostic_share_of_two_resamples_pct": 49.87825502316914,
+  "estimate_test1": {
+    "pass2_sec_doc": 1055.0,
+    "frames_doc": 1440,
+    "saved_sec_est": 526.2155904944344
+  }
+}
