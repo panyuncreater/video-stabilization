@@ -315,6 +315,8 @@ src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_
 
 | 文档 | 内容 | 对应章节 |
 |---|---|---|
+| `HANDOVER.md` | **交接总入口**：环境先决条件、验收档位、迁移规则、五阶段路线 | 迁移/接手 |
+| `CHANGELOG.md` | 文件级变更记录（增/改/删 + 验证证据） | §13.3 |
 | `docs/README.md` | 文档索引与阅读顺序、状态速查 | 全文导航 |
 | `docs/ARCHITECTURE.md` | 架构图、模块依赖、数学约定、降级与性能选择 | §6/§7/§8 |
 | `docs/API.md` | 模块接口签名、CLI、metrics.json、退出码 | §6 |
@@ -322,6 +324,9 @@ src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_
 | `docs/TESTS.md` | 测试清单与验收映射 | §11 |
 | `docs/KNOWN_ISSUES.md` | 已知问题与解决方案 | §12/§8.6 |
 | `docs/RESULTS.md` | 指标、产物、复现 | §9/§15 |
-| `docs/DEVELOPMENT.md` | 环境、命令、Git/编码约定、红线自检 | §3/§13 |
+| `docs/DEVELOPMENT.md` | 环境、命令、Git/编码约定、红线自检、迁移核查 | §3/§13 |
 
-新会话务必先读 `PROJECT_STATE.md` 与 `docs/README.md`。
+**核查工具**（迁移第一步）：`tools/verify_env.py`（环境/数据/红线/测试自检）、
+`tools/verify_invariance.py`（改前改后等价性）、`tools/transfer_check.ps1`（一键核查 + 落盘报告）。
+
+新会话务必先读 `PROJECT_STATE.md`、`HANDOVER.md` 与 `docs/README.md`。

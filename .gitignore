@@ -20,3 +20,6 @@ Thumbs.db
 
 # AI 助手工作目录
 .workbuddy/
+
+# 流水线在仓库根目录误生成时防污染（正常产物在 output/ 下）
+/metrics.json

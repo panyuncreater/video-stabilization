@@ -18,13 +18,15 @@
 
 ## 阅读顺序
 
+0. [../HANDOVER.md](../HANDOVER.md) —— **交接总入口**：环境先决条件、验收档位、核心命令、迁移规则（**新接手第一份**）
 1. [ARCHITECTURE.md](ARCHITECTURE.md) —— 架构、数据流、数学约定、异常降级（**必读**）
 2. [API.md](API.md) —— 各模块接口签名、CLI、metrics.json 结构、退出码
 3. [data_structures.md](data_structures.md) —— 课程核心：数据结构选型、复杂度、实测耗时
 4. [TESTS.md](TESTS.md) —— 测试清单与验收映射
 5. [KNOWN_ISSUES.md](KNOWN_ISSUES.md) —— 已知问题、根因与解决方案（当前无待决项）
 6. [RESULTS.md](RESULTS.md) —— 端到端指标、产物路径、复现步骤
-7. [DEVELOPMENT.md](DEVELOPMENT.md) —— 环境搭建、命令、Git 与编码约定、红线自检
+7. [DEVELOPMENT.md](DEVELOPMENT.md) —— 环境搭建、命令、Git 与编码约定、红线自检、迁移核查
+8. [../CHANGELOG.md](../CHANGELOG.md) —— 文件级变更记录（增/改/删 + 验证证据）
 
 ## 文档与契约的关系
 
@@ -37,6 +39,8 @@
 | KNOWN_ISSUES.md | §12 / §8.6 | 异常降级与「先报告数据再讨论」条款 |
 | RESULTS.md | §9 / §15 | 指标口径与交付物 |
 | DEVELOPMENT.md | §3 / §13 | 技术栈与会话协议 |
+| HANDOVER.md | §13 | 交接与迁移：环境先决条件、验收档位、核查工具 |
+| CHANGELOG.md | §13.3 | 文件级变更记录与验证证据 |
 
 ## 关键约定速查（易错点）
 
