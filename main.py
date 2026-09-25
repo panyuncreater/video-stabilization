@@ -10,6 +10,12 @@
 
 异常降级（§12）：角点 <20 降阈值重检、RANSAC 内点 <6 沿用 M_{t-1}（连续 5 帧退出码 2）、
 存活 <30 重新检测；非零退出不产出 metrics.json 并删除部分输出。
+诊断口径（--no-diagnostic）：pass 2 默认额外做一次「未裁剪 warp」用于掩膜 ITF 辅助诊断
+  （§9 辅助口径，不参与任何验收判据）。该 warp 与成片用的复合重采样是两次独立重采样，
+  跳过它**不改变成片与其它任何指标**，只在 metrics.metrics.itf_warped_masked_db 记 null。
+跟踪器选择（P4/A）：默认单层自研 LK；`--pyramid` 启用粗到细金字塔 LK（§8.2 加分项）。
+  注意参数交互：探针内部仍用单层 LK，启用 --pyramid 后必须重标 PROBE_SURVIVAL_THRESHOLD
+  并重跑双份回归（详见 src/tracking.py 模块 docstring）。
 镜头切换（§12 v2.3）：MAD>25 候选帧上由 shots.probe_cut_evidence 无状态探针（上一帧现检
 角点 + 单步跟踪的新鲜全集）独立取证，与当前跟踪点集证据取或——根治点集退化导致的
 切换假阴性（根因与标定见 src/shots.py 模块 docstring）。
@@ -36,6 +42,7 @@ MIN_CORNERS = 20       # §12：角点数下限（不足降阈值重检一次，
 MIN_INLIERS = 6        # §12：RANSAC 内点下限（不足沿用 M_{t-1}）
 MAX_FAIL_STREAK = 5    # §12：连续失败上限（达到则以退出码 2 终止）
 MIN_TRACKED = 30       # §12：跟踪存活下限（不足下一帧重新检测）
+PYRAMID_LEVELS = 3     # 金字塔 LK 层数（P4/A；--pyramid 时生效）
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,10 +57,18 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--clamp-theta", type=float, default=3.0, help="旋转限幅 度（默认 3）")
     ap.add_argument("--clamp-ln-s", type=float, default=0.05, help="对数尺度限幅（默认 0.05）")
     ap.add_argument("--no-clamp", action="store_true", help="关闭漂移限幅")
+    ap.add_argument("--no-diagnostic", action="store_true",
+                    help="跳过纯诊断的中间 warp 与掩膜 ITF（加速 pass2；该量仅作辅助诊断，"
+                         "不参与 §11 任何验收判据）")
+    ap.add_argument("--seed", type=int, default=42,
+                    help="RANSAC / 探针随机种子（默认 42；同一输入同一种子可逐位复现）")
+    ap.add_argument("--pyramid", action="store_true",
+                    help="启用自研金字塔 LK（§8.2 加分项，P4/A）。默认关闭以保持既有标定与"
+                         "指标不变；启用后须重标探针崩溃线并重跑双份回归")
     return ap.parse_args()
 
 
-def pass1_estimate(args, reader: io_utils.VideoReader):
+def pass1_estimate(args, reader: io_utils.VideoReader, rng):
     """pass 1：逐帧估计 M_t，累积轨迹，流式计算原视频 ITF。返回轨迹与统计。"""
     traj = trajectory.TrajectoryBuffer()
     deg = {"mt_identity_frames": 0, "ransac_fallback_frames": 0,
@@ -94,11 +109,16 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
                 prev, prev_gray = frame, gray
                 continue
 
-        new_pts, status = tracking.track_points(prev_gray, gray, points)
+        if args.pyramid:
+            new_pts, status = tracking.track_points_pyramid(prev_gray, gray, points,
+                                                            levels=PYRAMID_LEVELS)
+        else:
+            new_pts, status = tracking.track_points(prev_gray, gray, points)
         alive = int(status.sum())
         survival_ratio = float(alive) / float(len(points)) if len(points) else 1.0
         if alive >= 2:
-            M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status])
+            M, inl = motion.estimate_similarity_ransac(points[status], new_pts[status],
+                                                       rng=rng)
             inlier_ratio = float(inl.sum()) / float(alive)
         else:
             M, inl = None, np.zeros(0, dtype=bool)
@@ -110,7 +130,8 @@ def pass1_estimate(args, reader: io_utils.VideoReader):
         mad = shots.frame_mad(prev_gray, gray)
         p_surv, p_inl = (None, None)
         if mad > shots.MAD_THRESHOLD:
-            p_surv, p_inl = shots.probe_cut_evidence(prev_gray, gray, args.max_corners)
+            p_surv, p_inl = shots.probe_cut_evidence(prev_gray, gray, args.max_corners,
+                                                     rng=rng)
         if shots.is_cut(mad, inlier_ratio, frame_idx - last_cut, survival_ratio,
                         p_surv, p_inl):
             probe_note = f"，探针存活率={p_surv:.2f}" if p_surv is not None else ""
@@ -173,11 +194,14 @@ def smooth_trajectory(params_raw: np.ndarray, method: str, window: int) -> np.nd
 
 def run(args) -> int:
     t0 = time.perf_counter()
+    # 可复现性（2026-09-25 根因修复）：RANSAC 采样使用单一带种子 RNG 贯穿全链路。
+    # 此前 rng=None 时 motion 每次调用新建无种子生成器 → M_t 随机 → 成片不可复现。
+    rng = np.random.default_rng(args.seed)
 
     # ---------- pass 1 ----------
     with io_utils.VideoReader(args.input) as reader:
         fps, width, height = reader.fps, reader.width, reader.height
-        traj, deg, itf_orig_vals, n_frames = pass1_estimate(args, reader)
+        traj, deg, itf_orig_vals, n_frames = pass1_estimate(args, reader, rng)
     t1 = time.perf_counter()
 
     # ---------- 镜头分段（方案①） ----------
@@ -220,16 +244,21 @@ def run(args) -> int:
             io_utils.VideoWriterWrap(args.output, fps, width, height) as writer:
         prev_warped = None
         t = 0
+        diag = not args.no_diagnostic
         while True:
             frame = reader.read()
             if frame is None:
                 break
-            warped = warp.warp_frame(frame, B_list[t])  # 完整 warp 帧（供掩膜诊断 ITF）
-            if prev_warped is not None:
-                itf_warped_vals.append(metrics.psnr_gray(prev_warped, warped, rect))
             # 写出：补偿 warp + 裁剪 + 缩放复合为单次重采样（更快且避免二次插值模糊）
             writer.write(crop.warp_crop_resize(frame, B_list[t], rect, width, height))
-            prev_warped = warped
+            if diag:
+                # 纯诊断口径（§9 辅助）：未裁剪 warp + 掩膜 ITF。与上方成片重采样是两次
+                # 独立重采样，跳过它不改变成片与任何验收判据；--no-diagnostic 时整段跳过
+                # （仅 metrics.metrics.itf_warped_masked_db 记 null）。
+                warped = warp.warp_frame(frame, B_list[t])
+                if prev_warped is not None:
+                    itf_warped_vals.append(metrics.psnr_gray(prev_warped, warped, rect))
+                prev_warped = warped
             t += 1
     t2 = time.perf_counter()
 
@@ -252,6 +281,8 @@ def run(args) -> int:
         "height": height,
         "smoother": {"type": args.smooth, "window": window_eff(args.window),
                      "latency_frames": window_eff(args.window) // 2},
+        "seed": args.seed,
+        "diagnostic": {"masked_itf": not args.no_diagnostic},
         "clamp": {"enabled": not args.no_clamp, "tx_px": args.clamp_tx,
                   "theta_deg": args.clamp_theta, "ln_s": args.clamp_ln_s,
                   "events": clamp_events},

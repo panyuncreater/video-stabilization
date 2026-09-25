@@ -37,6 +37,8 @@
 | 名称 | 签名 | 说明 |
 |---|---|---|
 | `track_points` | `(prev_gray, curr_gray, pts, win=15) -> (new_pts (M,2) float32, status (M,) bool)` | 批量向量化，无逐点 Python 循环 |
+| `track_points_pyramid`（P4/A） | `(prev_gray, curr_gray, pts, win=15, levels=3) -> (new_pts, status)` | 粗到细金字塔 LK；2x2 均值池化降采样（`_downsample2x`），`levels` 上限 `PYRAMID_MAX_LEVELS=4` 且按尺寸自动降层。**默认不由主流水线调用**（需 `--pyramid`） |
+| `_downsample2x`（P4/A） | `(img) -> float32` | 2x2 均值池化（尺寸 (h//2, w//2)）。属尺度约简，不触红线 2（几何重采样才须走 `warp.resample`） |
 | 常量 | `MAX_ITERS=20`、`CONVERGE_EPS=0.01`、`LAMBDA_MIN=1e-4`、`RESIDUAL_MAX=0.05` | §8.2 参考值；2026-09-25 实验 0.075 证伪（ITF +0.614 vs +0.650）后维持 0.05 |
 
 status 为真的四条件：窗口结构张量 $\lambda_{min} > 10^{-4}$；平均光度残差 < 0.05；累计位移 ≤ 窗口半径（7 px）；点邻域不出界。
@@ -130,6 +132,7 @@ status 为真的四条件：窗口结构张量 $\lambda_{min} > 10^{-4}$；平�
 python main.py --input <mp4> --output <mp4> [--smooth ma|gauss|median] [--window 31]
                [--max-corners 500] [--vis]
                [--clamp-tx 30] [--clamp-theta 3.0] [--clamp-ln-s 0.05] [--no-clamp]
+               [--no-diagnostic] [--pyramid] [--seed 42]
 ```
 
 | 参数 | 默认 | 说明 |
@@ -140,12 +143,20 @@ python main.py --input <mp4> --output <mp4> [--smooth ma|gauss|median] [--window
 | `--vis` | 关 | 输出 docs/trajectory_\<stem\>.png、docs/metrics_bar_\<stem\>.png |
 | `--clamp-tx/-theta/-ln-s` | 30 px / 3° / 0.05 | 漂移限幅 |
 | `--no-clamp` | 关 | 关闭限幅 |
+| `--no-diagnostic` | 关（保留诊断） | P2/C：跳过纯诊断的中间 warp 与掩膜 ITF（§9 辅助口径，不参与任何验收判据）。**不传 = 与历史版本逐位一致**；传则 pass2 更快，`itf_warped_masked_db` 记 null、`diagnostic.masked_itf=false` |
+| `--pyramid` | 关（单层 LK） | P4/A：启用粗到细金字塔 LK（§8.2 加分项）。**默认关闭以保证既有标定与指标逐位不变**；启用后须重标探针崩溃线并重跑双份回归（参数交互见 KNOWN_ISSUES #23） |
+| `--seed` | `42` | RANSAC / 镜头探针的随机种子。**同一输入 + 同一种子 → 逐位可复现**；不传则用默认 42（可复现）。修复前 rng 无种子导致 test1 成片每次不同（KNOWN_ISSUES #24） |
 
 辅助工具：
 
 ```
 python tools/make_synthetic.py [--seed 42] [--frames 200] [--width 960] [--height 540] [--fps 30] [--out-dir data/synthetic]
 python tools/bench_ds.py
+python tools/verify_env.py [--run-tests] [--cov] [--json out.json]
+python tools/verify_invariance.py --baseline A.json --candidate B.json [--baseline-video A.mp4 --candidate-video B.mp4]
+python tools/transfer_check.ps1 [-Full] [-RunTest1] [-Cov] [-SkipTests]
+python tools/profile_pipeline.py [--width 960] [--height 540] [--frames 64] [--json docs/profile_pass2.json] [--md docs/RESULTS.md]
+python tools/profile_smoothers.py [--stage synth|test1|both] [--force] [--no-diagnostic] [--max-configs N] [--json docs/smoother_sweep.json] [--md docs/RESULTS.md]
 ```
 
 ## metrics.json 结构
@@ -154,6 +165,8 @@ python tools/bench_ds.py
 {
   "input": "...", "output": "...", "n_frames": 1440, "fps": 24.0, "width": 1280, "height": 976,
   "smoother": { "type": "gauss", "window": 31, "latency_frames": 15 },
+  "seed": 42,                              // RANSAC/探针随机种子（可复现性）
+  "diagnostic": { "masked_itf": true },   // P2 新增：false = 本次运行跳过了掩膜 ITF 诊断
   "clamp": { "enabled": true, "tx_px": 30, "theta_deg": 3.0, "ln_s": 0.05, "events": 0 },
   "shots": { "n_shots": 5, "cuts": [508, 809, 880, 1263],
              "segments": [[0,508],[508,809],[809,880],[880,1263],[1263,1440]] },

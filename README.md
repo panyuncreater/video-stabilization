@@ -8,10 +8,12 @@
 
 ## 文档中心（`docs/`）
 
-新接手请先读 [docs/README.md](docs/README.md)（含阅读顺序）：
+新接手请先读 [HANDOVER.md](HANDOVER.md)（交接总入口：环境先决条件、验收档位、迁移规则）与 [docs/README.md](docs/README.md)（含阅读顺序）：
 
 | 文档 | 内容 |
 |---|---|
+| [HANDOVER.md](HANDOVER.md) | **交接总入口**：环境先决条件、验收档位 A/B/C、核心命令、迁移规则 |
+| [CHANGELOG.md](CHANGELOG.md) | 文件级变更记录（增/改/删 + 验证证据） |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 两遍离线架构、模块依赖、数学约定、异常降级 |
 | [docs/API.md](docs/API.md) | 模块接口签名、CLI、metrics.json 结构、退出码 |
 | [docs/data_structures.md](docs/data_structures.md) | 数据结构选型、复杂度、实测耗时（课程报告素材） |
@@ -119,6 +121,7 @@ python main.py --input data/test1.mp4 --output output/test1/stabilized.mp4 --smo
 
 - `--smooth {ma|gauss|median}` 平滑器；`--window` 平滑窗口（默认 31，偶数自动 +1）；`--max-corners` 角点数（默认 500）；`--vis` 输出轨迹对比图与指标柱状图到 docs/。
 - `--clamp-tx / --clamp-theta / --clamp-ln-s` 漂移限幅（默认 30 px / 3° / 0.05），`--no-clamp` 关闭。
+- `--no-diagnostic` 跳过纯诊断的中间 warp 与掩膜 ITF（加速 pass2；该量仅作辅助诊断，不参与任何验收判据）。**不传则与历史版本逐位一致**；诊断 warp 占比可用 `python tools/profile_pipeline.py` 实测。
 - 产物：稳定视频 + 同目录 `metrics.json`（§15 字段），`--vis` 图在 docs/。
 - 退出码（§12）：0 成功；1 输入错误；2 连续 5 帧估计失败；3 输出封装不一致；4 内部错误。
 
@@ -157,6 +160,13 @@ python main.py --input data/test1.mp4 \
 | 切换检出 | 0（单镜头，探针零误触发） | 4/4（[508, 809, 880, 1263]） | — |
 
 覆盖率：`python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（核心模块总体 98%，§11 验收线 ≥80%）。
+
+**换机器 / 换 agent 接手时先做核查**（详见 [HANDOVER.md](HANDOVER.md)）：
+
+```powershell
+python tools\verify_env.py --cov      # 环境 + 数据 + 红线 + 测试 + 覆盖率（退出码 0 就绪 / 1 阻断 / 2 缺实拍素材）
+powershell -ExecutionPolicy Bypass -File tools\transfer_check.ps1 -Full   # 一键全档核查，报告落 .workbuddy/
+```
 
 已知问题与解决方案见 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)（遗留问题已全部收口，当前无待决项）。
 
