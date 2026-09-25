@@ -3,8 +3,9 @@
 warp 方向约定（§7，关键易错点）：
 - `warp_frame(img, M)` 中 M 为「输入图像坐标 → 输出图像坐标」的正向 3x3 齐次变换；
   内部对 M 求逆后做逆向映射采样，即 out(x) = img(M^{-1} x)。
-- cv2.warpAffine 的 M 是「输出 → 输入」约定；单元测试对照时应调用
-  cv2.warpAffine(img, np.linalg.inv(M), ...) 与本模块比较。
+- **OpenCV 5.0.0（本环境锁定版本）的 cv2.warpAffine 已改为同一正向约定**
+  （内部求逆采样，2026-09-24 实测确认），故单元测试对照时直接传 `M[:2]` 即可；
+  OpenCV ≤ 4 才是「输出 → 输入」约定，若降级需改回 `np.linalg.inv(M)[:2]`。
 
 越界策略：逐采样点四邻各自判定，越界邻点贡献为 0（与 cv2.BORDER_CONSTANT 一致），
 黑边交由 crop 模块处理（§8.6）。

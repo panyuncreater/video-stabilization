@@ -222,7 +222,7 @@ $$S = \frac{1}{4}\sum_{d} \left( 1 - \frac{E_{\mathrm{smooth},d}}{E_{\mathrm{raw
 
 ## 十五、交付物清单
 
-src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_STATE.md、docs/data_structures.md、docs/ 下的轨迹对比图与指标柱状图、稳定后视频、metrics.json。
+src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_STATE.md、docs/ 下的轨迹对比图与指标柱状图、稳定后视频、metrics.json，以及**文档体系**：docs/README.md（索引）、docs/ARCHITECTURE.md、docs/API.md、docs/data_structures.md（§10 报告素材）、docs/TESTS.md、docs/KNOWN_ISSUES.md、docs/RESULTS.md、docs/DEVELOPMENT.md（详见第十七节）。
 
 **metrics.json 字段（v2 定义）**：
 
@@ -286,3 +286,24 @@ src/、ds/、tests/、tools/、main.py、requirements.txt、README.md、PROJECT_
 | 报告局限性讨论要求 | E3 |
 
 **v2.1（2026-09-25）**：新增镜头切分能力（`src/shots.py`）以应对多镜头剪辑素材——此类素材按单镜头假设累积全局轨迹会污染轨迹、放大补偿偏差并压低裁剪率（实测 test1.mp4 由 0.786 回落至达标区间）。相应补充：§6 目录加 shots.py；§9 稳定度多镜头改为逐镜头加权聚合；§12 新增镜头切换处理规则。确认人：用户（2026-09-25 选方案①并确认新增模块与指标口径）。
+
+**v2.2（2026-09-25）**：M1 落地与文档体系建立。
+- **M1**：`src/features.py` 自研 Harris（移位差分 Sobel + 积分图盒式滤波 k=3 + 3×3 NMS + argpartition Top-N）、`src/tracking.py` 自研单层 LK（15×15 窗口、2×2 正规方程批量向量化、20 次迭代、四条件 status、自研双线性采样）；cv2 临时实现与 `TODO(SELF-IMPL)` 全部移除。§11 验收：角点检出率 1.000 / 定位误差 0.000 px；光流 EPE 0.0004–0.14 px、与 cv2 中位差异 0.0009 px；合成视频相对 M0 不退化（ITF +3.098 vs +3.094，S −0.85% ≤2%）。
+- **切换判据补丁**：改为「MAD>25 且（内点率<0.30 **或** 跟踪存活率<0.25）」——胶片齿孔/片框等跨场景静态结构会使切换帧内点率居高（0.80）而存活率崩溃（0.099），只看内点率会漏判。§12 同步。
+- **文档体系**：新增 `docs/` 文档中心（README 索引、ARCHITECTURE、API、data_structures、TESTS、KNOWN_ISSUES、RESULTS、DEVELOPMENT），README 增加文档索引与结果摘要；§15 交付物清单补充文档目录。
+- 遗留待决：切换检测假阴性（508/809/880）、M1 实拍 ITF 提升弱于 M0、覆盖率工具依赖——见 `docs/KNOWN_ISSUES.md`。
+
+## 十七、文档体系（v2.2）
+
+| 文档 | 内容 | 对应章节 |
+|---|---|---|
+| `docs/README.md` | 文档索引与阅读顺序、状态速查 | 全文导航 |
+| `docs/ARCHITECTURE.md` | 架构图、模块依赖、数学约定、降级与性能选择 | §6/§7/§8 |
+| `docs/API.md` | 模块接口签名、CLI、metrics.json、退出码 | §6 |
+| `docs/data_structures.md` | 数据结构五要素与实测耗时 | §10 |
+| `docs/TESTS.md` | 测试清单与验收映射 | §11 |
+| `docs/KNOWN_ISSUES.md` | 已知问题与解决方案 | §12/§8.6 |
+| `docs/RESULTS.md` | 指标、产物、复现 | §9/§15 |
+| `docs/DEVELOPMENT.md` | 环境、命令、Git/编码约定、红线自检 | §3/§13 |
+
+新会话务必先读 `PROJECT_STATE.md` 与 `docs/README.md`。

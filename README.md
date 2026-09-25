@@ -4,6 +4,23 @@
 
 核心算法（RANSAC、Harris 角点、LK 光流、图像 warp、环形缓冲、双堆中值等）全部自研，禁止调用 OpenCV 高层封装——完整约束、接口契约与验收基准见 [AGENTS.md](AGENTS.md)。
 
+**当前状态**：M1 已完成（自研 Harris + 单层 LK 替换 cv2 临时实现），pytest 54 passed，合成与实拍双份四项指标全部达标。下一步 M2（验收收口与报告素材定稿）。
+
+## 文档中心（`docs/`）
+
+新接手请先读 [docs/README.md](docs/README.md)（含阅读顺序）：
+
+| 文档 | 内容 |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 两遍离线架构、模块依赖、数学约定、异常降级 |
+| [docs/API.md](docs/API.md) | 模块接口签名、CLI、metrics.json 结构、退出码 |
+| [docs/data_structures.md](docs/data_structures.md) | 数据结构选型、复杂度、实测耗时（课程报告素材） |
+| [docs/TESTS.md](docs/TESTS.md) | 测试清单与验收映射 |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | 已知问题、根因、解决方案与待决策项 |
+| [docs/RESULTS.md](docs/RESULTS.md) | 端到端指标、产物路径、复现步骤 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 环境搭建、命令、Git/编码约定、红线自检 |
+| [PROJECT_STATE.md](PROJECT_STATE.md) | 交接状态（每次会话必读必更新） |
+
 ## 一、环境要求
 
 | 项目 | 要求 |
@@ -119,10 +136,26 @@ python tools/bench_ds.py                # 输出到 docs/bench_ds.json 与 docs/
 
 > **数据说明**：`data/test1.mp4`（11 MB）不入库。克隆仓库后如需实拍验收，请手动获取该文件放入 `data/`；无该文件时可仅用合成视频验收（`tools/make_synthetic.py` 生成）。
 
-## 四、结果复现（M2 交付后补充）
+## 四、结果复现
 
-- 合成数据：`python tools/make_synthetic.py`（种子 42，输出到 data/synthetic/，含真值 JSON）
-- 完整验收流程待 M2 后补充。
+完整指标、产物路径与复现步骤见 [docs/RESULTS.md](docs/RESULTS.md)。要点：
+
+```bash
+python -m pytest tests/ -q                       # 期望 54 passed
+python main.py --input data/synthetic/synthetic_shaky.mp4 \
+               --output output/synthetic/stabilized.mp4 --smooth gauss --window 31 --vis
+python main.py --input data/test1.mp4 \
+               --output output/test1/stabilized.mp4 --smooth gauss --window 31 --vis
+```
+
+| 指标（最新 M1） | 合成视频 | test1.mp4 | 验收线 |
+|---|---|---|---|
+| ITF 提升 | +3.10 dB | +0.65 dB | 高于原视频 |
+| 稳定度 S | 0.8081 | 0.9996 | 合成 ≥0.5 / 实拍 >0 |
+| 裁剪率 | 0.963 | 0.981 | ≥0.85 |
+| 失真值 D | 0.00675 | 0.00179 | 合成 ≤0.05 |
+
+已知问题与待决策项见 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)。
 
 ## 五、常见问题排查
 
