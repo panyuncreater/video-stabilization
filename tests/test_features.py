@@ -102,3 +102,23 @@ def test_retry_low_threshold_yields_at_least_as_many():
     normal = detect_corners(img, max_corners=500)
     retry = detect_corners_retry_low(img, max_corners=500)
     assert len(retry) >= len(normal)
+
+
+# ---------- v2.5 空间均匀化（KNOWN_ISSUES #21 根治） ----------
+
+def test_grid_bucketing_spreads_points_spatially():
+    """上带密集强纹理 + 下带稀疏纹理：全局 Top-N 会把点全部集中到上带，
+    网格分桶应让下带也分到可观份额——保证 y 方向几何基线。"""
+    img = np.full((160, 200), 255, dtype=np.uint8)
+    # 上带：8px 棋盘（角点密集、响应强）
+    band = ((np.add.outer(np.arange(80) // 8, np.arange(200) // 8) % 2) * 200 + 20)
+    img[:80, :] = band.astype(np.uint8)
+    # 下带：稀疏黑方块（角点少）
+    for y0 in (95, 125):
+        for x0 in (20, 90, 140):
+            img[y0:y0 + 30, x0:x0 + 30] = 0
+    pts = detect_corners(img, max_corners=60)     # 候选 240 >> 60，触发分桶
+    lower = pts[pts[:, 1] > 80]
+    print(f"\n总点数 {len(pts)}，下带点数 {len(lower)}（占比 {len(lower)/len(pts):.0%}）")
+    assert len(pts) >= 30, f"总点数 {len(pts)} 过少"
+    assert len(lower) / len(pts) >= 0.15, f"下带占比 {len(lower)/len(pts):.0%} —— 点集仍条带化"

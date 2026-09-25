@@ -1,6 +1,6 @@
 # API 参考
 
-> 对应 AGENTS.md §6 接口契约。**签名未经用户确认不得修改**；下表为当前实现（M1 + v2.3：自研特征/光流 + 无状态探针）。
+> 对应 AGENTS.md §6 接口契约。**签名未经用户确认不得修改**；下表为当前实现（M1 + v2.5：自研特征/光流 + 无状态探针 + 角点空间均匀化）。
 
 ## 约定
 
@@ -25,12 +25,12 @@
 
 | 名称 | 签名 | 说明 |
 |---|---|---|
-| `detect_corners` | `(gray, max_corners=500, quality=DEFAULT_QUALITY) -> (N,2) float32` | 契约入口；返回按响应降序的角点 |
-| `detect_corners_retry_low` | `(gray, max_corners=500)` | §12 降级：quality 0.01→0.005 重检 |
+| `detect_corners` | `(gray, max_corners=500, quality=DEFAULT_QUALITY) -> (N,2) float32` | 契约入口；返回按响应降序的角点（v2.5 空间均匀化：网格分桶 Top-N） |
+| `detect_corners_retry_low` | `(gray, max_corners=500)` | §12 降级：quality 0.001→0.0002 重检 |
 | `sobel_gradients` | `(gray) -> (gx, gy)` | 移位差分 3×3 Sobel，1/8 归一，灰度 [0,1] |
 | `box_filter` | `(img, k=BOX_SIZE)` | 积分图滑窗和，中心对齐，同尺寸输出 |
 | `harris_response` | `(gray) -> R` | $R=\det(H)-k\operatorname{tr}(H)^2$ |
-| 常量 | `K_HARRIS=0.04`、`DEFAULT_QUALITY=0.01`、`RETRY_QUALITY=0.005`、`BOX_SIZE=3`、`NMS_SIZE=3` | BOX_SIZE=3 的原因见 KNOWN_ISSUES #1 |
+| 常量 | `K_HARRIS=0.04`、`DEFAULT_QUALITY=0.001`、`RETRY_QUALITY=0.0002`、`BOX_SIZE=3`、`NMS_SIZE=3` | v2.5 阈值放宽（0.01→0.001）配合空间均匀化；BOXSIZE=3 原因见 KNOWN_ISSUES #1 |
 
 ## src/tracking.py（M1 自研单层 LK）
 
@@ -61,7 +61,7 @@ status 为真的四条件：窗口结构张量 $\lambda_{min} > 10^{-4}$；平�
 | `segment_shots` | `(cut_frames, n_frames) -> [(start, end)]` | end 为开区间 |
 | `collapse_shots` | `(shots, min_len=MIN_SHOT_LEN)` | 合并过短镜头 |
 | `shot_lengths` / `to_gray` | — | 辅助 |
-| 常量 | `MAD_THRESHOLD=25.0`、`INLIER_RATIO_THRESHOLD=0.30`、`SURVIVAL_RATIO_THRESHOLD=0.25`、`MIN_SHOT_LEN=12`、`PROBE_SURVIVAL_THRESHOLD=0.45` | 探针崩溃线标定（LK 残差 0.05）：切换帧探针存活 0.099–0.237 vs 常态 0.656–1.000，取间隔中点 |
+| 常量 | `MAD_THRESHOLD=25.0`、`INLIER_RATIO_THRESHOLD=0.30`、`SURVIVAL_RATIO_THRESHOLD=0.25`、`MIN_SHOT_LEN=12`、`PROBE_SURVIVAL_THRESHOLD=0.25` | 探针崩溃线标定（LK 残差 0.05）：v2.5 均匀化点集下切换帧探针存活 0.137–0.194 vs 常态 0.294–0.975，取间隔中点（v2.3 旧点集为 0.45） |
 
 ## src/trajectory.py
 
@@ -158,19 +158,19 @@ python tools/bench_ds.py
   "shots": { "n_shots": 5, "cuts": [508, 809, 880, 1263],
              "segments": [[0,508],[508,809],[809,880],[880,1263],[1263,1440]] },
   "metrics": {
-    "itf_original_db": 30.163, "itf_stabilized_db": 30.850, "itf_warped_masked_db": 30.702,
-    "cropping_ratio": 0.9718, "cropping_ratio_ok": true,
-    "distortion": 0.00193,
-    "stability": { "E_raw": [...], "E_smooth": [...], "S_per_dim": [...], "S": 0.9996,
-                   "S_reference_unnormalized": 0.288, "S_whole_sequence": 0.282,
+    "itf_original_db": 30.163, "itf_stabilized_db": 31.352, "itf_warped_masked_db": 31.190,
+    "cropping_ratio": 0.9685, "cropping_ratio_ok": true,
+    "distortion": 0.00187,
+    "stability": { "E_raw": [...], "E_smooth": [...], "S_per_dim": [...], "S": 0.9967,
+                   "S_reference_unnormalized": 0.0131, "S_whole_sequence": 0.0960,
                    "degenerate_dims": [], "negative": false,
                    "shots": [ { ...每镜头明细：E_raw/E_smooth/S_per_dim/S/S_reference_unnormalized/degenerate_dims/negative/start/end/n_frames... } ],
                    "n_shots_used": 5, "skipped_short_shots": 0 }
   },
   "degradations": { "mt_identity_frames": 0, "ransac_fallback_frames": 0,
-                    "redetection_frames": 2, "shot_cuts": [508, 809, 880, 1263] },
-  "runtime_sec": { "pass1": 102.5, "pass2": 633.5 }
+                    "redetection_frames": 47, "shot_cuts": [508, 809, 880, 1263] },
+  "runtime_sec": { "pass1": 98.2, "pass2": 1055.3 }
 }
 ```
 
-> 数值为 v2.3 最终回归（test1.mp4，探针 4/4 检出）的实测输出；合成视频为单镜头（`cuts: []`、`n_shots: 1`）。`S_whole_sequence` 为整段参考口径（§9 v2.1 说明两种口径不可直接比较）。
+> 数值为 v2.5 最终回归（test1.mp4，探针 4/4 检出 + 角点空间均匀化）的实测输出；合成视频为单镜头（`cuts: []`、`n_shots: 1`）。`S_whole_sequence` 为整段参考口径（§9 v2.1 说明两种口径不可直接比较）。v2.5 均匀化点集含更多弱角点，`redetection_frames` 由 2 升至 47（§12 存活 <30 重检测规则触发，非缺陷）。

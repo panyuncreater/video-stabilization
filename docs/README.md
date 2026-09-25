@@ -10,9 +10,9 @@
 
 | 项目 | 值 |
 |---|---|
-| 阶段 | **M2 验收达成（交付就绪）**——§11 全部 22 项基准通过（对照表见 RESULTS.md 第五节），剩余交付仅课程报告成稿 |
-| 下一步 | 课程报告成稿（素材已齐：data_structures / RESULTS / KNOWN_ISSUES / ARCHITECTURE） |
-| 测试 | pytest **59 passed**；核心模块覆盖率 **98%**（§11 验收线 ≥80%） |
+| 阶段 | **M2 验收达成（交付就绪）**——§11 全部 22 项基准通过（对照表见 RESULTS.md 第五节），剩余交付仅课程报告成稿；v2.5 已根治「修复后比原视频更抖」（KNOWN_ISSUES #21） |
+| 下一步 | 课程报告成稿（素材已齐：data_structures / RESULTS / KNOWN_ISSUES / ARCHITECTURE）；已批准优化 C→B→A 暂不执行 |
+| 测试 | pytest **60 passed**；核心模块覆盖率 **98%**（§11 验收线 ≥80%） |
 | 代码规模 | src/ 11 模块、ds/ 2 模块、tools/ 2 工具、tests/ 7 文件 |
 | 依赖 | numpy 2.5.3 / opencv-python 5.0.0 / matplotlib 3.11.2 / pytest 9.1.1 / pytest-cov 7.1.0（Python 3.13） |
 
@@ -44,7 +44,8 @@
 - 平滑为**居中（非因果）**，`update()` 返回 $y_{t-r}$（前 r 次返回 None），尾部必须 `flush()`。
 - 帧编号 **0-based**；$C_0 = I$；$B_0 = I$。
 - 所有几何重采样（含裁剪后缩放）走自研 `warp.resample`，**禁 cv2.resize**。
-- 切换判据的探针崩溃线（`shots.PROBE_SURVIVAL_THRESHOLD=0.45`）与 LK 残差阈值
+- 切换判据的探针崩溃线（`shots.PROBE_SURVIVAL_THRESHOLD=0.25`）与 LK 残差阈值
   （`tracking.RESIDUAL_MAX=0.05`）存在**参数交互**：放宽残差会使切换帧探针存活率抬升
-  （0.237→0.402 @帧809），重调任一参数须重标另一处并重跑双份回归。
+  （0.146→0.402 @帧809），重调任一参数须重标另一处并重跑双份回归。v2.5 角点空间均匀化后
+  点集含更多弱角点、常态帧存活率整体下移，探针线已由 0.45 重标为 0.25（见 KNOWN_ISSUES #21）。
 - 红线自检清单见 [DEVELOPMENT.md](DEVELOPMENT.md#红线自检清单)。

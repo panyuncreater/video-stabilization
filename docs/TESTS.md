@@ -11,11 +11,11 @@
 | `tests/test_smoothing.py` | 9 | `src/smoothing.py` |
 | `tests/test_motion.py` | 6 | `src/motion.py` |
 | `tests/test_shots.py` | 16 | `src/shots.py` |
-| `tests/test_features.py` | 9 | `src/features.py` |
+| `tests/test_features.py` | 10 | `src/features.py` |
 | `tests/test_tracking.py` | 4 | `src/tracking.py` |
-| **合计** | **59** | — |
+| **合计** | **60** | — |
 
-最近结果：**59 passed**（2026-09-25，v2.3 探针 + LK 残差实验回退 0.05 后）。
+最近结果：**60 passed**（2026-09-25，v2.5 角点空间均匀化 + 探针线重标 0.25 后）。
 
 **覆盖率（§11 验收线 ≥80%，2026-09-25 实测，pytest-cov）**：
 
@@ -23,9 +23,8 @@
 |---|---|
 | ds/heap.py / src/tracking.py | 100% |
 | src/smoothing.py / src/warp.py | 98% |
-| src/motion.py | 97% |
-| src/features.py | 96% |
-| ds/ring_buffer.py | 95% |
+| src/features.py | 97% |
+| src/motion.py / ds/ring_buffer.py | 95% |
 | **总体** | **98%** |
 
 测量命令：`python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（pytest-cov 已经用户批准加入 requirements.txt）。
@@ -66,7 +65,8 @@
 
 - §11 验收：合成角点图（白底黑方块网格，真值为方块四角像素）**检出率 ≥95%、定位误差 ≤1 px**（实测 1.000 / 0.000）。
 - 组件：Sobel 平坦区为 0；盒式滤波保常数、冲激均值正确、**中心对齐**（5×5 响应块边界检查）；全平坦图响应为 0 且检测为空。
-- 接口：返回 `float32`、(N,2)、`max_corners` 截断；降级重检（quality 0.005）点数不少于常规。
+- **v2.5 空间均匀化（KNOWN_ISSUES #21 根治）**：候选池远多于 `max_corners`（60）时，网格分桶后下带（图像下方 1/4 区域）仍能分到可观份额，验证角点不再被全局 Top-N 条带化。
+- 接口：返回 `float32`、(N,2)、`max_corners` 截断；降级重检（quality 0.0002）点数不少于常规。
 
 ### test_tracking.py（自研单层 LK）
 

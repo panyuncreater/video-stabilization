@@ -44,7 +44,7 @@ pip install --no-index --find-links=wheels -r requirements.txt
 
 | 目的 | 命令 |
 |---|---|
-| 单元测试 | `python -m pytest tests/ -q`（期望 59 passed） |
+| 单元测试 | `python -m pytest tests/ -q`（期望 60 passed） |
 | 覆盖率测量 | `python -m pytest tests/ --cov=ds --cov=src.smoothing --cov=src.motion --cov=src.warp --cov=src.features --cov=src.tracking`（核心模块总体 98%，§11 验收线 ≥80%） |
 | 合成数据 | `python tools/make_synthetic.py`（种子 42） |
 | 稳像运行 | `python main.py --input <mp4> --output <mp4> --smooth gauss --window 31 --vis` |
