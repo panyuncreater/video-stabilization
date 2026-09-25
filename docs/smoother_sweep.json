@@ -1,0 +1,1213 @@
+{
+  "configs": [
+    [
+      "synth",
+      "ma",
+      15
+    ],
+    [
+      "synth",
+      "ma",
+      31
+    ],
+    [
+      "synth",
+      "ma",
+      61
+    ],
+    [
+      "synth",
+      "median",
+      15
+    ],
+    [
+      "synth",
+      "median",
+      31
+    ],
+    [
+      "synth",
+      "median",
+      61
+    ],
+    [
+      "synth",
+      "gauss",
+      15
+    ],
+    [
+      "synth",
+      "gauss",
+      31
+    ],
+    [
+      "synth",
+      "gauss",
+      61
+    ]
+  ],
+  "extra_args": [
+    "--no-diagnostic"
+  ],
+  "runs": [
+    {
+      "tag": "synth/ma_w15",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\ma_15\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "ma",
+          "window": 15,
+          "latency_frames": 7
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 27.331301224636356,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9637268518518518,
+          "cropping_ratio_ok": true,
+          "distortion": 0.006486127878649265,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              1.1613745412634513,
+              2.2023491883292556,
+              9.118611994442648e-07,
+              5.436379960593596e-07
+            ],
+            "S_per_dim": [
+              0.6814643167800918,
+              0.6886324412380831,
+              0.5160821282631551,
+              0.7036946453871336
+            ],
+            "S": 0.647468382917116,
+            "S_reference_unnormalized": 0.6861942651847308,
+            "S_whole_sequence": 0.647468382917116,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  1.1613745412634513,
+                  2.2023491883292556,
+                  9.118611994442648e-07,
+                  5.436379960593596e-07
+                ],
+                "S_per_dim": [
+                  0.6814643167800918,
+                  0.6886324412380831,
+                  0.5160821282631551,
+                  0.7036946453871336
+                ],
+                "S": 0.647468382917116,
+                "S_reference_unnormalized": 0.6861942651847308,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 17.077,
+          "pass2": 24.115
+        }
+      }
+    },
+    {
+      "tag": "synth/ma_w31",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\ma_31\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "ma",
+          "window": 31,
+          "latency_frames": 15
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 29.78650799706764,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9320216049382716,
+          "cropping_ratio_ok": true,
+          "distortion": 0.012329421579382757,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              0.587559113884415,
+              0.3543778055052957,
+              5.383915600450467e-07,
+              2.750818722031884e-07
+            ],
+            "S_per_dim": [
+              0.8388473854699385,
+              0.9498981574927741,
+              0.7142796534638566,
+              0.8500689203448593
+            ],
+            "S": 0.8382735291928571,
+            "S_reference_unnormalized": 0.9121255613504373,
+            "S_whole_sequence": 0.8382735291928571,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  0.587559113884415,
+                  0.3543778055052957,
+                  5.383915600450467e-07,
+                  2.750818722031884e-07
+                ],
+                "S_per_dim": [
+                  0.8388473854699385,
+                  0.9498981574927741,
+                  0.7142796534638566,
+                  0.8500689203448593
+                ],
+                "S": 0.8382735291928571,
+                "S_reference_unnormalized": 0.9121255613504373,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 16.995,
+          "pass2": 27.435
+        }
+      }
+    },
+    {
+      "tag": "synth/ma_w61",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\ma_61\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "ma",
+          "window": 61,
+          "latency_frames": 30
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 32.16144889198624,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.8829803240740741,
+          "cropping_ratio_ok": true,
+          "distortion": 0.024207931900130864,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              0.1680315240211879,
+              0.12085937237440618,
+              3.2949834002105347e-07,
+              1.46849391490814e-07
+            ],
+            "S_per_dim": [
+              0.9539131999153838,
+              0.9829129331855568,
+              0.825137712251614,
+              0.9199609642155729
+            ],
+            "S": 0.9204812023920319,
+            "S_reference_unnormalized": 0.973048996420011,
+            "S_whole_sequence": 0.9204812023920319,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  0.1680315240211879,
+                  0.12085937237440618,
+                  3.294983400210534e-07,
+                  1.46849391490814e-07
+                ],
+                "S_per_dim": [
+                  0.9539131999153838,
+                  0.982912933185557,
+                  0.825137712251614,
+                  0.9199609642155729
+                ],
+                "S": 0.9204812023920319,
+                "S_reference_unnormalized": 0.973048996420011,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 15.882,
+          "pass2": 28.615
+        }
+      }
+    },
+    {
+      "tag": "synth/median_w15",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\median_15\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "median",
+          "window": 15,
+          "latency_frames": 7
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 27.349052046496865,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9629128086419753,
+          "cropping_ratio_ok": true,
+          "distortion": 0.0066587768388820315,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              8.460300502668888,
+              17.09345014721457,
+              3.917213628931337e-06,
+              3.50016083426845e-06
+            ],
+            "S_per_dim": [
+              -1.3204465959203793,
+              -1.4166675617840436,
+              -1.0788357741356882,
+              -0.9077334636608757
+            ],
+            "S": -1.1809208488752467,
+            "S_reference_unnormalized": -1.3839390515989476,
+            "S_whole_sequence": -1.1809208488752467,
+            "degenerate_dims": [],
+            "negative": true,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  8.460300502668888,
+                  17.09345014721457,
+                  3.917213628931337e-06,
+                  3.50016083426845e-06
+                ],
+                "S_per_dim": [
+                  -1.3204465959203793,
+                  -1.4166675617840436,
+                  -1.0788357741356882,
+                  -0.9077334636608756
+                ],
+                "S": -1.1809208488752467,
+                "S_reference_unnormalized": -1.3839390515989476,
+                "degenerate_dims": [],
+                "negative": true,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 17.171,
+          "pass2": 26.271
+        }
+      }
+    },
+    {
+      "tag": "synth/median_w31",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\median_31\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "median",
+          "window": 31,
+          "latency_frames": 15
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 29.667647410273528,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9300385802469135,
+          "cropping_ratio_ok": true,
+          "distortion": 0.01320168613386687,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              8.918898402483254,
+              24.369952609268715,
+              4.310659015655766e-06,
+              3.3239605328000775e-06
+            ],
+            "S_per_dim": [
+              -1.4462284088931903,
+              -2.4454175983092035,
+              -1.2876342780136931,
+              -0.8116969592444705
+            ],
+            "S": -1.4977443111151394,
+            "S_reference_unnormalized": -2.1055553512469345,
+            "S_whole_sequence": -1.4977443111151394,
+            "degenerate_dims": [],
+            "negative": true,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  8.918898402483254,
+                  24.369952609268715,
+                  4.310659015655766e-06,
+                  3.323960532800077e-06
+                ],
+                "S_per_dim": [
+                  -1.4462284088931905,
+                  -2.4454175983092035,
+                  -1.2876342780136931,
+                  -0.8116969592444705
+                ],
+                "S": -1.4977443111151394,
+                "S_reference_unnormalized": -2.1055553512469345,
+                "degenerate_dims": [],
+                "negative": true,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 14.414,
+          "pass2": 24.581
+        }
+      }
+    },
+    {
+      "tag": "synth/median_w61",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\median_61\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "median",
+          "window": 61,
+          "latency_frames": 30
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 4
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 31.26392206377579,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.8783333333333333,
+          "cropping_ratio_ok": true,
+          "distortion": 0.022080669045321404,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              7.5998684749327605,
+              21.013865496992068,
+              2.6333460550211226e-06,
+              3.920481073547675e-06
+            ],
+            "S_per_dim": [
+              -1.0844518379148775,
+              -1.9709348701934815,
+              -0.39749692087905086,
+              -1.1368255036826636
+            ],
+            "S": -1.1474272831675183,
+            "S_reference_unnormalized": -1.6694082832012676,
+            "S_whole_sequence": -1.1474272831675183,
+            "degenerate_dims": [],
+            "negative": true,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  7.5998684749327605,
+                  21.013865496992068,
+                  2.6333460550211226e-06,
+                  3.920481073547675e-06
+                ],
+                "S_per_dim": [
+                  -1.0844518379148775,
+                  -1.9709348701934815,
+                  -0.39749692087905086,
+                  -1.1368255036826636
+                ],
+                "S": -1.1474272831675183,
+                "S_reference_unnormalized": -1.6694082832012676,
+                "degenerate_dims": [],
+                "negative": true,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 16.695,
+          "pass2": 28.1
+        }
+      }
+    },
+    {
+      "tag": "synth/gauss_w15",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\gauss_15\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "gauss",
+          "window": 15,
+          "latency_frames": 7
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 26.525667215354375,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9808680555555556,
+          "cropping_ratio_ok": true,
+          "distortion": 0.0031758704984844676,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              2.1026146875953526,
+              4.353666561206239,
+              1.0509745943447985e-06,
+              9.61920871851418e-07
+            ],
+            "S_per_dim": [
+              0.423305934248589,
+              0.38447974734898716,
+              0.4422556971885777,
+              0.4757130533379227
+            ],
+            "S": 0.4314386080310192,
+            "S_reference_unnormalized": 0.3976860172490536,
+            "S_whole_sequence": 0.4314386080310192,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  2.1026146875953526,
+                  4.353666561206239,
+                  1.0509745943447985e-06,
+                  9.61920871851418e-07
+                ],
+                "S_per_dim": [
+                  0.423305934248589,
+                  0.38447974734898716,
+                  0.4422556971885777,
+                  0.4757130533379227
+                ],
+                "S": 0.4314386080310192,
+                "S_reference_unnormalized": 0.3976860172490536,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 15.983,
+          "pass2": 23.046
+        }
+      }
+    },
+    {
+      "tag": "synth/gauss_w31",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\gauss_31\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "gauss",
+          "window": 31,
+          "latency_frames": 15
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 27.60106649226008,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9629128086419753,
+          "cropping_ratio_ok": true,
+          "distortion": 0.006766319558152837,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              0.5719139744488304,
+              1.602855281991767,
+              4.6515918324511097e-07,
+              2.444675877784132e-07
+            ],
+            "S_per_dim": [
+              0.8431384517901654,
+              0.7733887346987741,
+              0.7531435243521603,
+              0.8667549806799645
+            ],
+            "S": 0.8091064228802661,
+            "S_reference_unnormalized": 0.7971132450770342,
+            "S_whole_sequence": 0.8091064228802661,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  0.5719139744488304,
+                  1.602855281991767,
+                  4.6515918324511097e-07,
+                  2.444675877784132e-07
+                ],
+                "S_per_dim": [
+                  0.8431384517901654,
+                  0.7733887346987741,
+                  0.7531435243521603,
+                  0.8667549806799645
+                ],
+                "S": 0.8091064228802661,
+                "S_reference_unnormalized": 0.7971132450770342,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 14.014,
+          "pass2": 23.23
+        }
+      }
+    },
+    {
+      "tag": "synth/gauss_w61",
+      "status": "ok",
+      "metrics": {
+        "input": "data\\synthetic\\synthetic_shaky.mp4",
+        "output": "output\\sweep\\synth\\gauss_61\\stabilized.mp4",
+        "n_frames": 200,
+        "fps": 30.0,
+        "width": 960,
+        "height": 540,
+        "smoother": {
+          "type": "gauss",
+          "window": 61,
+          "latency_frames": 30
+        },
+        "diagnostic": {
+          "masked_itf": false
+        },
+        "clamp": {
+          "enabled": true,
+          "tx_px": 30.0,
+          "theta_deg": 3.0,
+          "ln_s": 0.05,
+          "events": 0
+        },
+        "shots": {
+          "n_shots": 1,
+          "cuts": [],
+          "segments": [
+            [
+              0,
+              200
+            ]
+          ]
+        },
+        "metrics": {
+          "itf_original_db": 24.502953916172896,
+          "itf_stabilized_db": 29.924923545995533,
+          "itf_warped_masked_db": null,
+          "cropping_ratio": 0.9338348765432098,
+          "cropping_ratio_ok": true,
+          "distortion": 0.012868790716925909,
+          "stability": {
+            "E_raw": [
+              3.645979406525926,
+              7.073149165206555,
+              1.8843304880877308e-06,
+              1.8347221459080352e-06
+            ],
+            "E_smooth": [
+              0.10853327193792936,
+              0.1907699924615962,
+              9.953736272193299e-08,
+              3.9238196061411384e-08
+            ],
+            "S_per_dim": [
+              0.9702320666585045,
+              0.9730289877951379,
+              0.9471762711736695,
+              0.9786135485697798
+            ],
+            "S": 0.967262718549273,
+            "S_reference_unnormalized": 0.9720776463004953,
+            "S_whole_sequence": 0.967262718549273,
+            "degenerate_dims": [],
+            "negative": false,
+            "shots": [
+              {
+                "E_raw": [
+                  3.6459794065259254,
+                  7.073149165206555,
+                  1.8843304880877308e-06,
+                  1.8347221459080352e-06
+                ],
+                "E_smooth": [
+                  0.10853327193792936,
+                  0.1907699924615962,
+                  9.953736272193299e-08,
+                  3.9238196061411384e-08
+                ],
+                "S_per_dim": [
+                  0.9702320666585045,
+                  0.9730289877951379,
+                  0.9471762711736696,
+                  0.9786135485697799
+                ],
+                "S": 0.967262718549273,
+                "S_reference_unnormalized": 0.9720776463004953,
+                "degenerate_dims": [],
+                "negative": false,
+                "start": 0,
+                "end": 200,
+                "n_frames": 200
+              }
+            ],
+            "n_shots_used": 1,
+            "skipped_short_shots": 0
+          }
+        },
+        "degradations": {
+          "mt_identity_frames": 0,
+          "ransac_fallback_frames": 0,
+          "redetection_frames": 0,
+          "shot_cuts": []
+        },
+        "runtime_sec": {
+          "pass1": 16.649,
+          "pass2": 29.035
+        }
+      }
+    }
+  ],
+  "table_rows": [
+    {
+      "tag": "synth/gauss_w15",
+      "dataset": "synth",
+      "smoother": "gauss",
+      "window": 15,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 26.525667215354375,
+      "itf_gain": 2.022713299181479,
+      "S": 0.4314386080310192,
+      "crop": 0.9808680555555556,
+      "D": 0.0031758704984844676,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 15.983,
+      "pass2_s": 23.046
+    },
+    {
+      "tag": "synth/gauss_w31",
+      "dataset": "synth",
+      "smoother": "gauss",
+      "window": 31,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 27.60106649226008,
+      "itf_gain": 3.0981125760871855,
+      "S": 0.8091064228802661,
+      "crop": 0.9629128086419753,
+      "D": 0.006766319558152837,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 14.014,
+      "pass2_s": 23.23
+    },
+    {
+      "tag": "synth/gauss_w61",
+      "dataset": "synth",
+      "smoother": "gauss",
+      "window": 61,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 29.924923545995533,
+      "itf_gain": 5.421969629822637,
+      "S": 0.967262718549273,
+      "crop": 0.9338348765432098,
+      "D": 0.012868790716925909,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 16.649,
+      "pass2_s": 29.035
+    },
+    {
+      "tag": "synth/ma_w15",
+      "dataset": "synth",
+      "smoother": "ma",
+      "window": 15,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 27.331301224636356,
+      "itf_gain": 2.82834730846346,
+      "S": 0.647468382917116,
+      "crop": 0.9637268518518518,
+      "D": 0.006486127878649265,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 17.077,
+      "pass2_s": 24.115
+    },
+    {
+      "tag": "synth/ma_w31",
+      "dataset": "synth",
+      "smoother": "ma",
+      "window": 31,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 29.78650799706764,
+      "itf_gain": 5.283554080894746,
+      "S": 0.8382735291928571,
+      "crop": 0.9320216049382716,
+      "D": 0.012329421579382757,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 16.995,
+      "pass2_s": 27.435
+    },
+    {
+      "tag": "synth/ma_w61",
+      "dataset": "synth",
+      "smoother": "ma",
+      "window": 61,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 32.16144889198624,
+      "itf_gain": 7.658494975813344,
+      "S": 0.9204812023920319,
+      "crop": 0.8829803240740741,
+      "D": 0.024207931900130864,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 15.882,
+      "pass2_s": 28.615
+    },
+    {
+      "tag": "synth/median_w15",
+      "dataset": "synth",
+      "smoother": "median",
+      "window": 15,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 27.349052046496865,
+      "itf_gain": 2.84609813032397,
+      "S": -1.1809208488752467,
+      "crop": 0.9629128086419753,
+      "D": 0.0066587768388820315,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 17.171,
+      "pass2_s": 26.271
+    },
+    {
+      "tag": "synth/median_w31",
+      "dataset": "synth",
+      "smoother": "median",
+      "window": 31,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 29.667647410273528,
+      "itf_gain": 5.164693494100632,
+      "S": -1.4977443111151394,
+      "crop": 0.9300385802469135,
+      "D": 0.01320168613386687,
+      "clamp_events": 0,
+      "redetection": 0,
+      "pass1_s": 14.414,
+      "pass2_s": 24.581
+    },
+    {
+      "tag": "synth/median_w61",
+      "dataset": "synth",
+      "smoother": "median",
+      "window": 61,
+      "itf_orig": 24.502953916172896,
+      "itf_stab": 31.26392206377579,
+      "itf_gain": 6.760968147602895,
+      "S": -1.1474272831675183,
+      "crop": 0.8783333333333333,
+      "D": 0.022080669045321404,
+      "clamp_events": 4,
+      "redetection": 0,
+      "pass1_s": 16.695,
+      "pass2_s": 28.1
+    }
+  ],
+  "notes": [
+    "- [synth] 有效配置 9 个；同时达标的 5 个。",
+    "  - 稳定度最高：`gauss` w61（S=0.9673，ITF 增益 +5.422）",
+    "  - ITF 增益最高：`ma` w61（+7.658 dB，S=0.9205）",
+    "  - `ma`：S 随窗口 w15=0.6475 → w31=0.8383 → w61=0.9205；ITF 增益 w15=+2.828 → w31=+5.284 → w61=+7.658",
+    "  - `median`：S 随窗口 w15=-1.1809 → w31=-1.4977 → w61=-1.1474；ITF 增益 w15=+2.846 → w31=+5.165 → w61=+6.761",
+    "  - `gauss`：S 随窗口 w15=0.4314 → w31=0.8091 → w61=0.9673；ITF 增益 w15=+2.023 → w31=+3.098 → w61=+5.422"
+  ],
+  "acceptance": {
+    "S_synth_min": 0.5,
+    "S_test1_min": 0.0,
+    "crop_min": 0.85,
+    "D_synth_max": 0.05
+  }
+}
