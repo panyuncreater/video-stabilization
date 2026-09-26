@@ -137,7 +137,7 @@ python tools/make_synthetic.py          # 种子 42，输出到 data/synthetic/
 python tools/bench_ds.py                # 输出到 docs/bench_ds.json 与 docs/bench_ds.png
 ```
 
-> **数据说明**：`data/test1.mp4`（11 MB）不入库。克隆仓库后如需实拍验收，请手动获取该文件放入 `data/`；无该文件时可仅用合成视频验收（`tools/make_synthetic.py` 生成）。
+> **数据说明**：`data/test1.mp4`（11.3 MB）**已入库**（2026-09-26 起），克隆仓库后即可直接执行实拍档验收，无需手动获取。合成视频不入库，可用 `tools/make_synthetic.py` 重新生成（种子 42，约 6 MB）。
 
 ## 四、结果复现
 

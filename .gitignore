@@ -9,8 +9,10 @@ htmlcov/
 .venv/
 venv/
 
-# 大体积数据文件（不入库，由本地提供 / 工具重新生成）
+# 大体积数据文件（output/ 与合成视频不入库，由本地提供 / 工具重新生成）
+# 例外：实拍验收素材 data/test1.mp4 自 2026-09-26 起入库，保证「克隆即可跑实拍档」
 data/*.mp4
+!data/test1.mp4
 data/synthetic/*.mp4
 output/
 

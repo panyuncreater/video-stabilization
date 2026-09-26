@@ -175,6 +175,19 @@ test1 pass1 290.6 s / pass2 2297.4 s（文档 98 / 1055 s）。**主因是复跑
   （`docs/bench_ds.json|png`、`data/synthetic/ground_truth.json`），**已逐项核对后 `git checkout` 还原**
   （真值数值一致 ≤1.4e-14；bench 数值为本机版本相关，保留开发机原始记录）。
 
+**本会话（2026-09-26 验收报告发布 + 实拍素材入库，用户逐项选定）**：
+- `docs/TEST_RUN_2026-09-26.md`（新增）：独立机器验收复跑报告（环境差异、可复现命令、双档实测数值、
+  辅助工具、未执行项、遗留与提示）。
+- `data/test1.mp4`（**新增入库**）：远程原为网页上传到 `data/synthetic/test1.mp4`（blob `e204829f`，
+  与本机 `data/test1.mp4` 字节相同）；按用户决定**移入项目约定路径并正式入库**（内容零改动，git 识别为重命名），
+  错放副本已删除。
+- `.gitignore`（改）：`data/*.mp4` 之后新增 `!data/test1.mp4` 例外，并在注释说明入库决定。
+- `AGENTS.md`（改 §6 目录树）、`README.md`（改「数据说明」）、`HANDOVER.md`（改 §2.2 表与 §七缺口行）、
+  `docs/RESULTS.md`（改 §一 素材表）、`docs/DEVELOPMENT.md`（改目录树与「不入库」清单）、
+  `docs/KNOWN_ISSUES.md`（改 #18）：「test1.mp4 不入库」表述统一同步为「已入库（2026-09-26 起）」。
+- **本轮未采纳（用户未勾选，仍待决）**：把两份实测 `metrics.json` 复制进 `docs/` 入库；
+  把 README / docs/TESTS / docs/RESULTS 中过期的「60 passed」改齐为 **74 passed**。
+
 **本会话（P4：A. 金字塔 LK，零默认行为改动）**——详见 CHANGELOG.md [P4]：
 - src/tracking.py（改）：新增 `_downsample2x` / `_lk_iterate` / `_lk_level` / `track_points_pyramid` + `PYRAMID_MAX_LEVELS`；模块 docstring 补金字塔说明与**探针参数交互**警告。单层实现未动。
 - main.py（改）：`--pyramid`（默认关）+ `PYRAMID_LEVELS=3`；跟踪调用点按开关分派；docstring 补跟踪器选择说明。
@@ -360,3 +373,4 @@ python main.py --input data/test1.mp4 --output output/test1_pyramid/stabilized.m
 - 2026-09-25：**实拍档验证与不确定性发现**。① 环境改用「手动 wheel 解包」打通（pip 受限，非工程问题）；② P2 合成档严格的逐像素等价 + 53% 提速达标；③ P3 合成档完成，`median` S<0 为选型提供实测依据；④ P4 金字塔**未获收益**（ITF +1.172 vs +1.186）→ 建议不启用，保持默认关闭；⑤ **发现 test1 端到端结果不可复现**，经「合成档对照 + 单线程 BLAS + 200 帧短片」三重实验排除线程归约、长序列累计与 `--no-diagnostic` 三个假设，定位为**素材内容相关**（阈值边界翻转）。确认人：AI 执行 + 如实上报（未据此宣称任何验收结论）；下一步待用户决定是否投入定位根因。
 - 2026-09-25：**RANSAC 可复现性缺陷定位并修复**（用户指令「直接定位根因」）。根因：`estimate_similarity_ransac` 在 `rng=None` 时每次新建无种子生成器，而 `main.py`/`shots.py` 均未传 rng（单测传了种子故未暴露）。修复：新增 `--seed`（默认 42），单一 RNG 贯穿 pass1 与镜头探针，metrics.json 记录 seed。验证：同种子两次 **200/200 帧逐位相同**；换种子 **0/200 帧相同**。**推论**：test1 对 RANSAC 采样极敏感，此前实拍档「逐帧等价」判定均不可信，P2 实拍档等价性须在固定种子下重跑。确认人：AI 定位并修复（属缺陷修复，不改数学口径；接口为新增可选 `--seed`，默认 42 保证后续可复现）。
 - 2026-09-26：**独立机器机上验收复跑**（用户指令「测试一下文件夹里的项目」）。决策与做法：① **只读复跑、零代码改动**，不触碰任何验收线或口径（§13.4）；② 依赖安装走 README 标准路径，但因 Python 3.10 无 numpy 2.5.3 / matplotlib 3.11.2 的 wheel（安装会转向源码编译），改用项目内 `--system-site-packages` venv，**仅补装锁定版 pytest/pytest-cov/coverage**，并把版本差异作为环境事实如实上报，**不擅自改 requirements.txt**；③ `--vis` 会覆写已入库的 4 张图，改为「临时目录 + 真实 metrics」等价验证可视化代码路径，保持仓库无污染；④ 复跑误写的已入库产物（真值 JSON、bench 产物）一律逐项核对后 `git checkout` 还原。结论：§11 全部可执行项通过（74 passed / 覆盖率 98% / 双档四项指标达标 / 切换 4/4 与文档逐值一致）。确认人：用户（本轮任务指令）。
+- 2026-09-26：**验收结果发布 + 实拍素材入库**（用户指令「这是这个项目的 GitHub 链接，我应该如何更新我测试的结果到这上面？」）。决策（均由用户在选项中逐项选定）：① 发布载体定为**新增独立报告** `docs/TEST_RUN_2026-09-26.md`（含环境差异、复现命令、双档数值、未执行项），而非只改 STATE——便于交付/答辩直接引用；② 远程 `data/synthetic/test1.mp4`（网页上传）**移入项目约定路径 `data/test1.mp4` 并正式入库**，`.gitignore` 加 `!data/test1.mp4` 例外，并同步 AGENTS §6 / README / HANDOVER / docs 的「不入库」表述——**这是对 AGENTS.md §6 明文的修改，已由用户在选项中确认**；③ 未采纳项留档：实测 `metrics.json` 未复制入库、文档中过期的「60 passed」未改齐（两项用户本轮均未勾选）。确认人：用户（本次两项选择）。

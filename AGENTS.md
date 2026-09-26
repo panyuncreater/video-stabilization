@@ -66,7 +66,7 @@ main.py           流水线入口：--input --output --smooth {ma|gauss|median} 
                  --vis --clamp-tx --clamp-theta --clamp-ln-s --no-clamp
 tests/            每个自研模块的 pytest
 docs/             data_structures.md（数据结构报告素材）、实验数据、图表
-data/             test1.mp4（实拍验收视频，gitignore 不入库）；synthetic/（合成视频 + 真值 JSON）
+data/             test1.mp4（实拍验收视频，2026-09-26 起入库）；synthetic/（合成视频 + 真值 JSON）
 PROJECT_STATE.md  交接状态文件（模板见第十四节）
 README.md         环境安装、运行说明、结果复现步骤
 ```

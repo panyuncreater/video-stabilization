@@ -43,7 +43,7 @@
 | 路径 | 状态 | 迁移动作 |
 |---|---|---|
 | `.venv/` | gitignore，**不迁移** | 每台机器各自建（§2.3） |
-| `data/test1.mp4` | gitignore，**不迁移** | 手动获取放入 `data/`；缺失则只能做合成档验收 |
+| `data/test1.mp4` | **已入库**（2026-09-26 起，11.3 MB） | 克隆即得，无迁移动作；实拍档验收直接可用 |
 | `data/synthetic/synthetic_shaky.mp4` | gitignore，**可由代码重建** | `python tools/make_synthetic.py`（种子 42） |
 | `output/` | gitignore | 由运行产生；改动前后对比需要各自留存（§四） |
 | `.workbuddy/` | gitignore，AI 工作目录 | 存放本地证据（环境快照、对比产物） |
@@ -194,7 +194,7 @@ B 需要多遍 test1 回归，A 是最大改动、压轴。
 
 | 缺口 | 影响 | 处理 |
 |---|---|---|
-| 实拍素材 `data/test1.mp4` 不入库 | 新机器默认只能做合成档 | 用户按需提供；`verify_env.py` 会明确报出 |
+| ~~实拍素材 `data/test1.mp4` 不入库~~ **已于 2026-09-26 关闭** | 克隆即可跑实拍档，不再受「只能做合成档」限制 | `data/test1.mp4` 已入库；`verify_env.py` 不再报缺素材 |
 | 原机 `.venv` 不可迁移 | 新机器需重建 | §2.3 命令；版本以 `requirements.txt` 为准 |
 | 无 CI 配置 | 回归靠手工执行 | 用 `tools/transfer_check.ps1` 一键跑，报告落 `.workbuddy/` |
 | pass2 耗时偏长（test1 ≈ 1055 s） | 多遍回归代价高 | P2 解决（目标 −20~30%） |

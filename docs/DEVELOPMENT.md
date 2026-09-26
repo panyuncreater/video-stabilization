@@ -62,7 +62,7 @@ ds/         手写数据结构（2 个）
 tools/      合成数据生成器、计时基准
 tests/      pytest（7 个文件）
 docs/       文档中心（本目录）
-data/       测试素材（*.mp4 不入库）与合成数据
+data/       测试素材（实拍 test1.mp4 已入库；合成 *.mp4 不入库）与合成数据
 output/     运行产物（不入库）
 main.py     流水线入口
 HANDOVER.md 交接总入口（环境先决条件 / 验收档位 / 迁移规则）
@@ -125,7 +125,8 @@ grep -rn "TODO(SELF-IMPL)" src/ ds/
 - 提交信息前缀：`docs:`（文档）、`feat:`（功能）、`fix:`（修复）、`refactor:`（重构）、`test:`（测试）、`chore:`（杂项）。
 - 中文正文，首行不超过 72 字，正文用 `-` 列表说明改动与原因。
 - 提交前：跑 `python -m pytest tests/ -q`；更新 PROJECT_STATE.md。
-- 不入库：`output/`、`data/*.mp4`、`.venv/`、`.workbuddy/`（见 `.gitignore`）。
+- 不入库：`output/`、`data/synthetic/*.mp4`、`.venv/`、`.workbuddy/`（见 `.gitignore`）。
+  **例外**：实拍素材 `data/test1.mp4` 自 2026-09-26 起入库（保证克隆即可跑实拍档）。
 
 ## 九、会话协议摘要（§13）
 
